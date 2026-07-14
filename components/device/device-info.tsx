@@ -1,116 +1,57 @@
 "use client";
 
-import Image from "next/image";
+import Avatar from "@mui/material/Avatar";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import type { ConnectedDevice, DeviceReading } from "@/types/bluetooth";
 import { getCategoryById } from "@/lib/bluetooth/categories";
-import { Card } from "@/components/ui/card";
 
 interface DeviceInfoProps {
   device: ConnectedDevice;
-}
-
-export function DeviceInfo({ device }: DeviceInfoProps) {
-  const category = getCategoryById(device.categoryId);
-
-  return (
-    <Card>
-      <div className="mb-4 flex items-center gap-3">
-        {category && (
-          <Image
-            src={category.image}
-            alt=""
-            width={40}
-            height={40}
-            className="shrink-0 rounded-lg"
-            aria-hidden="true"
-          />
-        )}
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Device Information
-        </h2>
-      </div>
-      <dl className="space-y-3">
-        <InfoRow label="Name" value={device.name} />
-        <InfoRow label="Device ID" value={device.id} />
-        <InfoRow
-          label="Category"
-          value={category ? `${category.icon} ${category.name}` : device.categoryId}
-        />
-        <InfoRow
-          label="Connected"
-          value={device.connectedAt.toLocaleString()}
-        />
-        <InfoRow
-          label="Status"
-          value={device.server.connected ? "Connected" : "Disconnected"}
-          valueClassName={
-            device.server.connected ? "text-green-600 dark:text-green-400" : "text-red-600"
-          }
-        />
-      </dl>
-    </Card>
-  );
-}
-
-function InfoRow({
-  label,
-  value,
-  valueClassName,
-}: {
-  label: string;
-  value: string;
-  valueClassName?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
-      <dt className="text-sm text-zinc-500 dark:text-zinc-400">{label}</dt>
-      <dd
-        className={`text-sm font-medium text-zinc-900 dark:text-zinc-50 ${valueClassName ?? ""}`}
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-interface DeviceDataPanelProps {
   readings: DeviceReading[];
 }
 
-export function DeviceDataPanel({ readings }: DeviceDataPanelProps) {
-  return (
-    <Card>
-      <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-        Live Data
-      </h2>
+export function DeviceInfo({ device, readings }: DeviceInfoProps) {
+  const category = getCategoryById(device.categoryId);
+  const productUid = readings.find((r) => r.id === "product_uid")?.value ?? "—";
+  const serialNumber = readings.find((r) => r.id === "serial_number")?.value ?? "—";
 
-      {readings.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Waiting for data from the device. Make sure the device is sending
-          notifications on supported characteristics.
-        </p>
-      ) : (
-        <ul className="space-y-3" role="list">
-          {readings.map((reading) => (
-            <li
-              key={reading.id}
-              className="flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-800"
-            >
-              <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                {reading.label}
-              </span>
-              <div className="text-right">
-                <p className="font-semibold text-zinc-900 dark:text-zinc-50">
-                  {reading.value}
-                </p>
-                <p className="text-xs text-zinc-400">
-                  {reading.timestamp.toLocaleTimeString()}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+  return (
+    <Card variant="outlined">
+      <CardContent>
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", mb: 2 }}>
+          {category && <Avatar variant="rounded" src={category.image} sx={{ width: 40, height: 40 }} />}
+          <Typography variant="h6" component="h2">
+            Device Information
+          </Typography>
+        </Stack>
+        <Stack spacing={1.5}>
+          <InfoRow label="Name" value={device.name} />
+          <InfoRow
+            label="Category"
+            value={category ? `${category.icon} ${category.name}` : device.categoryId}
+          />
+          <InfoRow label="Product UID" value={productUid} />
+          <InfoRow label="Serial Number" value={serialNumber} />
+          <InfoRow label="Device ID" value={device.id} />
+          <InfoRow label="Connected" value={device.connectedAt.toLocaleString()} />
+        </Stack>
+      </CardContent>
     </Card>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <Stack direction={{ xs: "column", sm: "row" }} spacing={0.5} sx={{ justifyContent: "space-between" }}>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+        {value}
+      </Typography>
+    </Stack>
   );
 }

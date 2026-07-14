@@ -10,6 +10,7 @@ export type DeviceCategoryId =
 
 export interface DeviceCategory {
   id: DeviceCategoryId;
+  title: string;
   name: string;
   description: string;
   icon: string;

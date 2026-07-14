@@ -1,9 +1,13 @@
 export function isBluetoothSupported(): boolean {
-  return typeof navigator !== "undefined" && "bluetooth" in navigator;
+  return (
+    typeof navigator !== "undefined" &&
+    typeof window !== "undefined" &&
+    "bluetooth" in navigator
+  );
 }
 
 export function getBluetoothSupportMessage(): string | null {
-  if (typeof navigator === "undefined") {
+  if (typeof navigator === "undefined" || typeof window === "undefined") {
     return null;
   }
 

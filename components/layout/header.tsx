@@ -1,13 +1,35 @@
+"use client";
+
 import Link from "next/link";
+import AppBar from "@mui/material/AppBar";
+import Container from "@mui/material/Container";
+import Toolbar from "@mui/material/Toolbar";
+import Typography from "@mui/material/Typography";
 
 export function Header() {
   return (
-    <header className="border-b border-zinc-200 bg-white/80 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/80">
-      <div className="mx-auto flex h-14 max-w-3xl items-center px-4">
-        <Link href="/" className="text-lg font-semibold text-secondary">
-          MS Connect
-        </Link>
-      </div>
-    </header>
+    <AppBar
+      position="static"
+      color="transparent"
+      elevation={0}
+      sx={{
+        borderBottom: 1,
+        borderColor: "divider",
+        backdropFilter: "blur(6px)",
+      }}
+    >
+      <Container maxWidth="md">
+        <Toolbar variant="dense" disableGutters sx={{ minHeight: 56 }}>
+          <Typography
+            component={Link}
+            href="/"
+            variant="h6"
+            sx={{ fontWeight: 700, color: "secondary.main", textDecoration: "none" }}
+          >
+            MS Connect
+          </Typography>
+        </Toolbar>
+      </Container>
+    </AppBar>
   );
 }

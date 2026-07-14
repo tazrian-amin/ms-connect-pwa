@@ -1,53 +1,33 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import Alert from "@mui/material/Alert";
+import Container from "@mui/material/Container";
+import Typography from "@mui/material/Typography";
 import { CategoryGrid } from "@/components/home/category-grid";
-import { ConnectDeviceModal } from "@/components/home/connect-device-modal";
 import { useBluetooth } from "@/context/bluetooth-provider";
 
 export function HomePage() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const { supportMessage, isSupportChecked } = useBluetooth();
+  const { supportMessage } = useBluetooth();
 
   return (
-    <div className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Connect Your Device
-        </h1>
-        <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-          Pair Bluetooth devices, monitor live data, and manage connections from
-          your browser.
-        </p>
-      </div>
+    <Container maxWidth="md" sx={{ py: 4, flex: 1 }}>
+      <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }} gutterBottom>
+        Connect Your Device
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        Pair Bluetooth devices, monitor live data, and manage connections.
+      </Typography>
 
       {supportMessage && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+        <Alert severity="warning" sx={{ mb: 3 }}>
           {supportMessage}
-        </div>
+        </Alert>
       )}
 
-      <section className="mb-8">
-        <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Device Categories
-        </h2>
-        <CategoryGrid />
-      </section>
-
-      <Button
-        size="lg"
-        className="w-full sm:w-auto"
-        onClick={() => setModalOpen(true)}
-        disabled={!isSupportChecked || !!supportMessage}
-      >
-        Connect Device
-      </Button>
-
-      <ConnectDeviceModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-      />
-    </div>
+      <Typography variant="h6" component="h2" gutterBottom>
+        Device Categories
+      </Typography>
+      <CategoryGrid />
+    </Container>
   );
 }

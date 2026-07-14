@@ -1,103 +1,135 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import {
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useCallback, useRef, useState } from "react";
+import Box from "@mui/material/Box";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Typography from "@mui/material/Typography";
+import { LineChart } from "@mui/x-charts/LineChart";
 import type { AdcSample } from "@/types/bluetooth";
-import { Card } from "@/components/ui/card";
-
-// Horizontal spacing per point so the trace never looks congested.
-const PIXELS_PER_POINT = 12;
-// How close to the right edge counts as "already viewing the latest data".
-const AUTO_SCROLL_THRESHOLD_PX = PIXELS_PER_POINT * 2;
 
 interface TelemetryChartProps {
   samples: AdcSample[];
 }
 
-export function TelemetryChart({ samples }: TelemetryChartProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  // Tracks whether the user was viewing the latest data before this update,
-  // so newly appended points don't yank the view away from a manual scroll-back.
-  const isNearEndRef = useRef(true);
+const CHART_HEIGHT = 300;
+const MAX_CHART_POINTS = 100;
 
-  const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const distanceFromEnd = el.scrollWidth - el.scrollLeft - el.clientWidth;
-    isNearEndRef.current = distanceFromEnd < AUTO_SCROLL_THRESHOLD_PX;
-  };
+/**
+ * Downsamples to at most `maxPoints` by taking the min and max of each
+ * bucket (in chronological order), so spikes/dips stay visible instead of
+ * being smoothed away like plain stride decimation would.
+ */
+function downsampleMinMax(samples: AdcSample[], maxPoints: number): AdcSample[] {
+  if (samples.length <= maxPoints) return samples;
 
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (isNearEndRef.current) {
-      el.scrollLeft = el.scrollWidth;
+  const bucketCount = Math.max(1, Math.floor(maxPoints / 2));
+  const bucketSize = samples.length / bucketCount;
+  const result: AdcSample[] = [];
+
+  for (let i = 0; i < bucketCount; i++) {
+    const start = Math.floor(i * bucketSize);
+    const end = Math.floor((i + 1) * bucketSize);
+    const bucket = samples.slice(start, end);
+    if (bucket.length === 0) continue;
+
+    let min = bucket[0];
+    let max = bucket[0];
+    for (const sample of bucket) {
+      if (sample.value < min.value) min = sample;
+      if (sample.value > max.value) max = sample;
     }
-  }, [samples]);
 
-  const data = samples.map((sample) => ({
-    time: sample.timestamp.toLocaleTimeString([], {
+    if (min === max) {
+      result.push(min);
+    } else if (min.timestamp.getTime() <= max.timestamp.getTime()) {
+      result.push(min, max);
+    } else {
+      result.push(max, min);
+    }
+  }
+
+  return result;
+}
+
+export function TelemetryChart({ samples }: TelemetryChartProps) {
+  const [width, setWidth] = useState(0);
+  const observerRef = useRef<ResizeObserver | null>(null);
+  
+  const containerRef = useCallback((node: HTMLDivElement | null) => {
+    observerRef.current?.disconnect();
+    observerRef.current = null;
+    if (!node) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const nextWidth = entries[0]?.contentRect.width ?? 0;
+      setWidth((current) => (Math.abs(current - nextWidth) > 0.5 ? nextWidth : current));
+    });
+    observer.observe(node);
+    observerRef.current = observer;
+  }, []);
+
+  // The average is computed from every sample, not just the ones plotted,
+  // so downsampling for display never skews it.
+  const average =
+    samples.length > 0 ? samples.reduce((sum, s) => sum + s.value, 0) / samples.length : null;
+
+  const displaySamples = downsampleMinMax(samples, MAX_CHART_POINTS);
+  const xLabels = displaySamples.map((sample) =>
+    sample.timestamp.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
     }),
-    value: sample.value,
-  }));
-
-  const innerWidth = Math.max(data.length * PIXELS_PER_POINT, 320);
+  );
+  const values = displaySamples.map((sample) => sample.value);
 
   return (
-    <Card>
-      <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-        Live Telemetry
-      </h2>
+    <Card variant="outlined">
+      <CardContent>
+        <Typography variant="h6" component="h2" gutterBottom>
+          Live Telemetry
+        </Typography>
 
-      {data.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Waiting for ADC readings from the device...
-        </p>
-      ) : (
-        <div
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className="overflow-x-auto rounded-lg bg-zinc-50 p-2 dark:bg-zinc-800/50"
-        >
-          <div style={{ width: innerWidth, height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <XAxis
-                  dataKey="time"
-                  tick={{ fontSize: 11 }}
-                  interval="preserveStartEnd"
-                  minTickGap={40}
-                />
-                <YAxis
-                  tick={{ fontSize: 11 }}
-                  width={40}
-                  domain={["auto", "auto"]}
-                />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  name="Raw ADC Value"
-                  stroke="#28a745"
-                  strokeWidth={2}
-                  dot={false}
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+        {samples.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            Waiting for ADC readings from the device...
+          </Typography>
+        ) : (
+          <Box ref={containerRef} sx={{ width: "100%", height: CHART_HEIGHT }}>
+            {width > 0 && (
+              <LineChart
+                width={width}
+                height={CHART_HEIGHT}
+                series={[
+                  { id: "raw", data: values, label: "Raw ADC Value" },
+                  ...(average !== null
+                    ? [
+                        {
+                          id: "average",
+                          data: values.map(() => average),
+                          label: "Average",
+                          color: "#ef4444",
+                          showMark: false,
+                        },
+                      ]
+                    : []),
+                ]}
+                xAxis={[{ scaleType: "point", data: xLabels, height: 28 }]}
+                yAxis={[{ width: 50 }]}
+                grid={{ horizontal: true }}
+                margin={{ right: 24 }}
+                skipAnimation
+                sx={{
+                  "& path[data-series='average']": {
+                    strokeDasharray: "6 4",
+                  },
+                }}
+              />
+            )}
+          </Box>
+        )}
+      </CardContent>
     </Card>
   );
 }

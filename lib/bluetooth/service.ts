@@ -1,16 +1,16 @@
 import type { ConnectedDevice, DeviceCategory } from "@/types/bluetooth";
 
-export async function getAuthorizedDevices(): Promise<BluetoothDevice[]> {
-  if (!navigator.bluetooth.getDevices) {
-    return [];
-  }
-  return navigator.bluetooth.getDevices();
-}
-
 export async function requestDevice(
   category: DeviceCategory,
 ): Promise<BluetoothDevice> {
-  return navigator.bluetooth.requestDevice({
+  const bluetooth =
+    typeof navigator !== "undefined" ? navigator.bluetooth : undefined;
+
+  if (!bluetooth?.requestDevice) {
+    throw new Error("Web Bluetooth is not available in this browser.");
+  }
+
+  return bluetooth.requestDevice({
     ...category.filters,
   });
 }

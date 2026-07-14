@@ -7,6 +7,19 @@
   --primary-foreground: #000000;
   --secondary: #000000;
   --secondary-foreground: #ffffff;
+
+  /* Shared "panel" tokens for the bespoke device dashboards (scale/pump
+     instrument panels) that render with plain CSSProperties instead of MUI's
+     sx system, so they can't read useTheme() directly. Keyed to the same
+     prefers-color-scheme signal MUI's ThemeProvider uses in app/providers.tsx,
+     so both stay in sync. */
+  --panel-bg: #ffffff;
+  --panel-bg-alt: #f1f3f5;
+  --panel-border: #d1d5db;
+  --panel-border-muted: #e5e7eb;
+  --panel-text: #111827;
+  --panel-text-muted: #6b7280;
+  --panel-control-bg: #e5e7eb;
 }
 
 @theme inline {
@@ -26,6 +39,14 @@
     --foreground: #fafafa;
     --secondary: #ffffff;
     --secondary-foreground: #000000;
+
+    --panel-bg: #18181b;
+    --panel-bg-alt: #232326;
+    --panel-border: #3f3f46;
+    --panel-border-muted: #27272a;
+    --panel-text: #fafafa;
+    --panel-text-muted: #a1a1aa;
+    --panel-control-bg: #27272a;
   }
 }
 

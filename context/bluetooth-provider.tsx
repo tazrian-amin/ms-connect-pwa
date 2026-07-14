@@ -22,7 +22,6 @@ import type {
 import {
   connectToDevice,
   disconnectDevice,
-  getAuthorizedDevices,
   getBluetoothErrorMessage,
   requestDevice,
 } from "@/lib/bluetooth/service";
@@ -50,12 +49,9 @@ interface BluetoothContextValue {
   status: ConnectionStatus;
   error: string | null;
   connectedDevice: ConnectedDevice | null;
-  discoveredDevices: BluetoothDevice[];
   readings: DeviceReading[];
   selectedCategory: DeviceCategory | null;
-  setSelectedCategory: (category: DeviceCategory | null) => void;
-  scanForDevices: () => Promise<boolean>;
-  connectDevice: (device: BluetoothDevice) => Promise<ConnectedDevice | null>;
+  connectCategory: (category: DeviceCategory) => Promise<boolean>;
   disconnect: () => Promise<void>;
   clearError: () => void;
   adcSamples: AdcSample[];
@@ -86,9 +82,6 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [connectedDevice, setConnectedDevice] = useState<ConnectedDevice | null>(
     null,
-  );
-  const [discoveredDevices, setDiscoveredDevices] = useState<BluetoothDevice[]>(
-    [],
   );
   const [readings, setReadings] = useState<DeviceReading[]>([]);
   const [selectedCategory, setSelectedCategory] =
@@ -144,62 +137,27 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
     };
   }, [connectedDevice, handleDisconnect]);
 
-  const scanForDevices = useCallback(async (): Promise<boolean> => {
-    if (supportMessage) {
-      setError(supportMessage);
-      return false;
-    }
-
-    if (!selectedCategory) {
-      setError("Please select a device category first.");
-      return false;
-    }
-
-    setStatus("scanning");
-    setError(null);
-
-    try {
-      const authorized = await getAuthorizedDevices();
-      const newDevice = await requestDevice(selectedCategory);
-
-      const allDevices = [
-        ...authorized.filter(
-          (d) => !newDevice.id || d.id !== newDevice.id,
-        ),
-        newDevice,
-      ];
-
-      const uniqueDevices = allDevices.filter(
-        (device, index, array) =>
-          array.findIndex((d) => d.id === device.id) === index,
-      );
-
-      setDiscoveredDevices(uniqueDevices);
-      setStatus("idle");
-      return true;
-    } catch (err) {
-      setError(getBluetoothErrorMessage(err));
-      setStatus("error");
-      return false;
-    }
-  }, [selectedCategory, supportMessage]);
-
-  const connectDevice = useCallback(
-    async (device: BluetoothDevice): Promise<ConnectedDevice | null> => {
-      if (!selectedCategory) {
-        setError("No device category selected.");
-        return null;
+  const connectCategory = useCallback(
+    async (category: DeviceCategory): Promise<boolean> => {
+      if (supportMessage) {
+        setError(supportMessage);
+        return false;
       }
 
-      setStatus("connecting");
+      setSelectedCategory(category);
+      setStatus("scanning");
       setError(null);
 
       try {
+        const device = await requestDevice(category);
+
+        setStatus("connecting");
+
         unsubscribeRef.current?.();
         unsubscribeRef.current = null;
         rxCharacteristicRef.current = null;
 
-        const connected = await connectToDevice(device, selectedCategory.id);
+        const connected = await connectToDevice(device, category.id);
 
         setConnectedDevice(connected);
         setReadings([]);
@@ -269,7 +227,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
         ]);
 
-        if (reportedCategory !== null && reportedCategory !== selectedCategory.id) {
+        if (reportedCategory !== null && reportedCategory !== category.id) {
           unsubscribe();
           rxCharacteristicRef.current = null;
           unsubscribeRef.current = null;
@@ -277,20 +235,21 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
           setConnectedDevice(null);
           setStatus("error");
           setError(
-            `This device reports category "${reportedCategory}", not "${selectedCategory.name}". Choose the matching category and reconnect.`,
+            `This device reports category "${reportedCategory}", not "${category.name}". Choose the matching category and reconnect.`,
           );
-          return null;
+          return false;
         }
 
         setStatus("connected");
-        return connected;
+        setError(null);
+        return true;
       } catch (err) {
         setError(getBluetoothErrorMessage(err));
         setStatus("error");
-        return null;
+        return false;
       }
     },
-    [selectedCategory, appendCommandLog],
+    [supportMessage, appendCommandLog],
   );
 
   const sendCommand = useCallback(
@@ -336,12 +295,9 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       status,
       error,
       connectedDevice,
-      discoveredDevices,
       readings,
       selectedCategory,
-      setSelectedCategory,
-      scanForDevices,
-      connectDevice,
+      connectCategory,
       disconnect,
       clearError,
       adcSamples,
@@ -358,11 +314,9 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       status,
       error,
       connectedDevice,
-      discoveredDevices,
       readings,
       selectedCategory,
-      scanForDevices,
-      connectDevice,
+      connectCategory,
       disconnect,
       clearError,
       adcSamples,
