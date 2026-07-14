@@ -57,7 +57,7 @@ export function DeviceDetailsPage({ category }: DeviceDetailsPageProps) {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: 4, flex: 1 }}>
+    <Container maxWidth="xl" sx={{ py: 4, flex: 1 }}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
         spacing={2}

@@ -10,7 +10,7 @@ export function HomePage() {
   const { supportMessage } = useBluetooth();
 
   return (
-    <Container maxWidth="md" sx={{ py: 4, flex: 1 }}>
+    <Container maxWidth="xl" sx={{ py: 4, flex: 1 }}>
       <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }} gutterBottom>
         Connect Your Device
       </Typography>

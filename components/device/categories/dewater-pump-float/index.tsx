@@ -14,6 +14,7 @@ import { PumpMonitoringDashboard } from "./pump-monitoring-dashboard";
 
 export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
   const { connectedDevice, readings, adcSamples } = useBluetooth();
+  const samples = isConnected ? adcSamples : [];
 
   return (
     <Stack spacing={2}>
@@ -28,9 +29,9 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
           <PumpMonitoringDashboard />
         </CardContent>
       </Card>
-      <TelemetryChart samples={adcSamples} />
+      <TelemetryChart samples={samples} />
       <SamplePeriodControl />
-      <CommandConsole />
+      <CommandConsole categoryId="dewater-pump-float" />
     </Stack>
   );
 }

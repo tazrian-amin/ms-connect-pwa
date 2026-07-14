@@ -18,7 +18,7 @@ export function Header() {
         backdropFilter: "blur(6px)",
       }}
     >
-      <Container maxWidth="md">
+      <Container maxWidth="xl">
         <Toolbar variant="dense" disableGutters sx={{ minHeight: 56 }}>
           <Typography
             component={Link}

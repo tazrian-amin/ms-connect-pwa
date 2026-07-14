@@ -30,6 +30,15 @@ export function getAppTheme(mode: PaletteMode) {
     shape: {
       borderRadius: 8,
     },
+    breakpoints: {
+      values: {
+        xs: 0,
+        sm: 600,
+        md: 900,
+        lg: 1200,
+        xl: 1400,
+      },
+    },
     components: {
       MuiButton: {
         defaultProps: {

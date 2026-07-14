@@ -25,6 +25,7 @@ import {
   getBluetoothErrorMessage,
   requestDevice,
 } from "@/lib/bluetooth/service";
+import { logBleEvent } from "@/lib/bluetooth/debug-log";
 import { getBluetoothSupportMessage } from "@/lib/bluetooth/support";
 import {
   parseAdcLine,
@@ -114,6 +115,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
   const clearCommandLog = useCallback(() => setCommandLog([]), []);
 
   const handleDisconnect = useCallback(() => {
+    logBleEvent("Disconnected");
     unsubscribeRef.current?.();
     unsubscribeRef.current = null;
     rxCharacteristicRef.current = null;
@@ -151,6 +153,9 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       try {
         const device = await requestDevice(category);
 
+        logBleEvent(
+          `Device selected: ${device.name ?? "Unknown"} (${device.id}) for category "${category.id}"`,
+        );
         setStatus("connecting");
 
         unsubscribeRef.current?.();
@@ -159,6 +164,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
 
         const connected = await connectToDevice(device, category.id);
 
+        logBleEvent(`GATT connected: ${connected.name}`);
         setConnectedDevice(connected);
         setReadings([]);
         setAdcSamples([]);

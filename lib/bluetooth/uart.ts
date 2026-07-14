@@ -1,3 +1,4 @@
+import { logBleReceive, logBleSend } from "./debug-log";
 import { BLUETOOTH_CHARACTERISTICS, BLUETOOTH_SERVICES, toBluetoothUUID } from "./uuid";
 
 // Classic BLE 4.0 ATT MTU (23 bytes) minus the 3-byte header, matching the HM-10's default link budget.
@@ -26,7 +27,10 @@ function createLineReader(onLine: UartLineHandler) {
 
     for (let i = 0; i < lines.length - 1; i++) {
       const line = lines[i].trim();
-      if (line.length > 0) onLine(line);
+      if (line.length > 0) {
+        logBleReceive(line);
+        onLine(line);
+      }
     }
   };
 }
@@ -64,6 +68,7 @@ export async function sendUartCommand(
   commandObj: unknown,
 ): Promise<void> {
   const payload = JSON.stringify(commandObj) + "\n";
+  logBleSend(JSON.stringify(commandObj));
   const bytes = new TextEncoder().encode(payload);
 
   for (

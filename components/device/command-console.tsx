@@ -8,12 +8,26 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useBluetooth } from "@/context/bluetooth-provider";
+import {
+  CATEGORY_CONFIG_COMMANDS,
+  CATEGORY_ECHO_COMMANDS,
+} from "@/lib/bluetooth/commands";
+import type { DeviceCategoryId } from "@/types/bluetooth";
 
-export function CommandConsole() {
+interface CommandConsoleProps {
+  /** The category of the details page this console is rendered on — it
+   * decides which command set is shown, independent of connection state. */
+  categoryId: DeviceCategoryId;
+}
+
+export function CommandConsole({ categoryId }: CommandConsoleProps) {
   const { commandLog, sendCommand, sendGetConfig, clearCommandLog } =
     useBluetooth();
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+
+  const echoCommands = CATEGORY_ECHO_COMMANDS[categoryId];
+  const configCommands = CATEGORY_CONFIG_COMMANDS[categoryId];
 
   const lastJson = useMemo(() => {
     const lastIn = commandLog.findLast((entry) => entry.direction === "in");
@@ -83,6 +97,57 @@ export function CommandConsole() {
           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
             {status}
           </Typography>
+        )}
+
+        {configCommands.length > 0 && (
+          <>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 3 }}>
+              Configuration Commands
+            </Typography>
+            <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
+              Loads a template into the input — adjust the value, then press Send.
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+              {configCommands.map((template) => (
+                <Button
+                  key={template.label}
+                  size="small"
+                  variant="outlined"
+                  color="secondary"
+                  onClick={() => {
+                    setInput(JSON.stringify(template.command));
+                    setStatus(null);
+                  }}
+                >
+                  {template.label}
+                </Button>
+              ))}
+            </Stack>
+          </>
+        )}
+
+        {echoCommands.length > 0 && (
+          <>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 3 }}>
+              Echo Commands
+            </Typography>
+            <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
+              Sends immediately.
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+              {echoCommands.map((echo) => (
+                <Button
+                  key={echo.label}
+                  size="small"
+                  variant="outlined"
+                  color="secondary"
+                  onClick={() => sendCommand(echo.command)}
+                >
+                  {echo.label}
+                </Button>
+              ))}
+            </Stack>
+          </>
         )}
 
         {lastJson && (

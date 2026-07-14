@@ -5,9 +5,10 @@ import {
   useEffect,
   useRef,
   useState,
-  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 
 import {
   LED_COLUMN_WIDTH,
@@ -93,64 +94,67 @@ export function PumpThresholdPointer({
   };
 
   return (
-    <div
+    <Box
       ref={hitAreaRef}
       role="slider"
       aria-label={`Pump ${label.toLowerCase()} trigger level`}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={value}
-      style={{ ...zoneHitAreaStyle, top: zoneTop, height: zoneHeight }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      sx={{
+        position: "absolute",
+        left: 0,
+        top: zoneTop,
+        width: LED_COLUMN_WIDTH,
+        height: zoneHeight,
+        zIndex: 2,
+        cursor: "ns-resize",
+        touchAction: "none",
+      }}
     >
-      <div style={{ ...thumbStyle, top: thumbTop }}>
-        <div style={thumbBarStyle}>
-          <span style={thumbLabelStyle}>{label}</span>
-        </div>
-      </div>
-    </div>
+      <Box
+        sx={{
+          position: "absolute",
+          top: thumbTop,
+          left: (LED_COLUMN_WIDTH - THRESHOLD_POINTER_WIDTH) / 2,
+          width: THRESHOLD_POINTER_WIDTH,
+          height: THRESHOLD_POINTER_HEIGHT,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            height: THRESHOLD_POINTER_HEIGHT,
+            borderRadius: "5px",
+            bgcolor: PumpMonitoringPalette.thresholdPointer,
+            border: `2px solid ${PumpMonitoringPalette.thresholdPointerBorder}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 1px 3px rgba(15, 23, 42, 0.2)",
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: 0.6,
+              color: PumpMonitoringPalette.thresholdPointerGrip,
+            }}
+          >
+            {label}
+          </Typography>
+        </Box>
+      </Box>
+    </Box>
   );
 }
-
-const zoneHitAreaStyle: CSSProperties = {
-  position: "absolute",
-  left: 0,
-  width: LED_COLUMN_WIDTH,
-  zIndex: 2,
-  cursor: "ns-resize",
-  touchAction: "none",
-};
-
-const thumbStyle: CSSProperties = {
-  position: "absolute",
-  left: (LED_COLUMN_WIDTH - THRESHOLD_POINTER_WIDTH) / 2,
-  width: THRESHOLD_POINTER_WIDTH,
-  height: THRESHOLD_POINTER_HEIGHT,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  pointerEvents: "none",
-};
-
-const thumbBarStyle: CSSProperties = {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  height: THRESHOLD_POINTER_HEIGHT,
-  borderRadius: 5,
-  backgroundColor: PumpMonitoringPalette.thresholdPointer,
-  border: `2px solid ${PumpMonitoringPalette.thresholdPointerBorder}`,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.2)",
-};
-
-const thumbLabelStyle: CSSProperties = {
-  fontSize: 9,
-  fontWeight: 700,
-  letterSpacing: 0.6,
-  color: PumpMonitoringPalette.thresholdPointerGrip,
-};

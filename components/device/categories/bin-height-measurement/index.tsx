@@ -18,9 +18,10 @@ const MAX_ADC = 4095;
 
 export function BinHeightMeasurementDetails({ isConnected }: CategoryDetailsProps) {
   const { connectedDevice, readings, adcSamples } = useBluetooth();
+  const samples = isConnected ? adcSamples : [];
 
   const latestAdc =
-    adcSamples.length > 0 ? adcSamples[adcSamples.length - 1].value : null;
+    samples.length > 0 ? samples[samples.length - 1].value : null;
   const fillLevel =
     latestAdc == null
       ? 0
@@ -46,9 +47,9 @@ export function BinHeightMeasurementDetails({ isConnected }: CategoryDetailsProp
           </Typography>
         </CardContent>
       </Card>
-      <TelemetryChart samples={adcSamples} />
+      <TelemetryChart samples={samples} />
       <SamplePeriodControl />
-      <CommandConsole />
+      <CommandConsole categoryId="bin-height-measurement" />
     </Stack>
   );
 }

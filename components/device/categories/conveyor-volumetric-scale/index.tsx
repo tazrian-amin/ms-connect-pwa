@@ -11,9 +11,11 @@ import { CommandConsole } from "@/components/device/command-console";
 import { useBluetooth } from "@/context/bluetooth-provider";
 import type { CategoryDetailsProps } from "@/components/device/categories";
 import { ScaleMonitoringDashboard } from "./scale-monitoring-dashboard";
+import { VolumetricConfigPanel } from "./volumetric-config-panel";
 
 export function ConveyorVolumetricScaleDetails({ isConnected }: CategoryDetailsProps) {
   const { connectedDevice, readings, adcSamples } = useBluetooth();
+  const samples = isConnected ? adcSamples : [];
 
   return (
     <Stack spacing={2}>
@@ -28,9 +30,10 @@ export function ConveyorVolumetricScaleDetails({ isConnected }: CategoryDetailsP
           <ScaleMonitoringDashboard />
         </CardContent>
       </Card>
-      <TelemetryChart samples={adcSamples} />
+      <VolumetricConfigPanel />
+      <TelemetryChart samples={samples} />
       <SamplePeriodControl />
-      <CommandConsole />
+      <CommandConsole categoryId="conveyor-volumetric-scale" />
     </Stack>
   );
 }

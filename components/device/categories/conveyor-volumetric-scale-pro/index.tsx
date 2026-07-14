@@ -9,15 +9,16 @@ import type { CategoryDetailsProps } from "@/components/device/categories";
 
 export function ConveyorVolumetricScaleProDetails({ isConnected }: CategoryDetailsProps) {
   const { connectedDevice, readings, adcSamples } = useBluetooth();
+  const samples = isConnected ? adcSamples : [];
 
   return (
     <div className="space-y-4">
       {isConnected && connectedDevice && (
         <DeviceInfo device={connectedDevice} readings={readings} />
       )}
-      <TelemetryChart samples={adcSamples} />
+      <TelemetryChart samples={samples} />
       <SamplePeriodControl />
-      <CommandConsole />
+      <CommandConsole categoryId="conveyor-volumetric-scale-pro" />
     </div>
   );
 }
