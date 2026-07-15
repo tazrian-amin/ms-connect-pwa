@@ -1,9 +1,7 @@
-// Chrome tokens (backgrounds/borders/text) resolve to CSS variables defined
-// in app/globals.css, which flip with the same prefers-color-scheme signal
-// MUI's ThemeProvider uses (see app/providers.tsx) — this row/gauge/status
-// markup renders with plain CSSProperties, not MUI's sx, so it can't call
-// useTheme() directly. Status/indicator colors (LED, state, accent) stay
-// fixed since they carry fixed semantic meaning independent of theme mode.
+// Chrome tokens reuse app/globals.css CSS variables so they flip with theme
+// mode even though this markup uses plain CSSProperties, not MUI's sx/
+// useTheme(). Status/indicator colors stay fixed regardless of theme since
+// they carry fixed semantic meaning.
 export const ScalePalette = {
   panelBg: "var(--panel-bg)",
   rowBg: "var(--panel-bg-alt)",

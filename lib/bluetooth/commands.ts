@@ -1,11 +1,9 @@
 import type { DeviceCategoryId } from "@/types/bluetooth";
 
 // Command sets from the "Mining Sentry — System Commands Reference".
-// Key casing is firmware-specific: the Dewatering water level monitor uses
-// PascalCase-ish keys ("Set_Data_E_T_sec", "Echo") while the Retrofit Float
-// uses all-lowercase keys ("set_data_e_t_sec", "echo") — do not "normalize"
-// them. Numeric values are sent as strings for both families, matching the
-// reference examples exactly.
+// Key casing is firmware-specific (Dewatering: "Set_Data_E_T_sec"/"Echo",
+// Retrofit Float: "set_data_e_t_sec"/"echo") — do not normalize it. Numeric
+// values are sent as strings for both, matching the reference examples.
 
 /** A ready-to-send echo/diagnostic query with a human label for the UI. */
 export interface EchoCommand {

@@ -1,9 +1,7 @@
-// Chrome tokens (backgrounds/borders/text) resolve to the same CSS variables
-// as the scale dashboard (app/globals.css), which flip with the
-// prefers-color-scheme signal MUI's ThemeProvider uses (app/providers.tsx) —
-// this column/LED markup renders with plain CSSProperties, not MUI's sx, so
-// it can't call useTheme() directly. LED/indicator/status colors stay fixed
-// since they carry fixed semantic meaning independent of theme mode.
+// Chrome tokens reuse the scale dashboard's CSS variables (app/globals.css) so
+// they flip with theme mode even though this markup uses plain CSSProperties,
+// not MUI's sx/useTheme(). LED/indicator/status colors stay fixed regardless
+// of theme since they carry fixed semantic meaning.
 export const PumpMonitoringPalette = {
   panelBg: "var(--panel-bg)",
   columnBg: "var(--panel-bg-alt)",

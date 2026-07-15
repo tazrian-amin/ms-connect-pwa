@@ -293,9 +293,8 @@ const controlsStyle: CSSProperties = {
   flexShrink: 0,
 };
 
-// Colors are pinned to ScalePalette (not the ambient MUI theme) so this
-// button keeps working against the row's own hardcoded light background
-// regardless of whether the app theme is in light or dark mode.
+// Pinned to ScalePalette, not the ambient MUI theme, since the row keeps a
+// hardcoded light background regardless of app theme mode.
 const rateGraphButtonSx = {
   bgcolor: ScalePalette.buttonBg,
   color: ScalePalette.buttonText,

@@ -1,14 +1,11 @@
 import type { DeviceCategory } from "@/types/bluetooth";
 import { BLUETOOTH_SERVICES, toBluetoothUUID } from "./uuid";
 
-// Every device is a Blues Swan R5 board paired with the same HM-10 UART
-// bridge, so requestDevice can't filter by service UUID (they're all
-// identical) or by advertised name (many HM-10 clones ignore AT+NAME
-// entirely and always broadcast their factory-default name, e.g. "HMSoft").
-// So the native scan can't be pre-filtered by category at all - every
-// category accepts any nearby UART bridge, and the actual category is
-// confirmed after connecting by reading the device's own get_config reply
-// (see the connectDevice category check in bluetooth-provider.tsx).
+// Every device uses the same HM-10 UART bridge with identical service UUIDs
+// and often the same factory-default advertised name, so the native scan
+// can't be pre-filtered by category — any category accepts any nearby UART
+// bridge, and the real category is confirmed post-connect via get_config
+// (see bluetooth-provider.tsx's category check).
 function hm10Category(category: Omit<DeviceCategory, "filters">): DeviceCategory {
   return {
     ...category,

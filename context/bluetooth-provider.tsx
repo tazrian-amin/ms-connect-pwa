@@ -127,11 +127,8 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
     useRef<BluetoothRemoteGATTCharacteristic | null>(null);
   const logIdRef = useRef(0);
   const replyWaitersRef = useRef<ReplyWaiter[]>([]);
-  // Set right before sending a command that resets the MCU (set_config,
-  // set_product_uid/set_serial_number, reset_config) so the next
-  // gattserverdisconnected event is treated as an expected reboot instead of
-  // a lost connection. Cleared on an error reply (the MCU didn't reset) or
-  // once consumed by the disconnect handler.
+  // Marks the next disconnect as an expected reboot (not a lost connection).
+  // Set before MCU-resetting commands; cleared on error reply or once consumed.
   const expectingResetRef = useRef(false);
 
   const clearError = useCallback(() => setError(null), []);
@@ -152,9 +149,8 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
 
   const clearCommandLog = useCallback(() => setCommandLog([]), []);
 
-  // Builds the notification handler shared by the initial connect and by
-  // post-reset reconnection. `onCategoryReported` is only needed for the
-  // initial connect's category-mismatch check.
+  // Shared by initial connect and post-reset reconnection; onCategoryReported
+  // is only used for the initial connect's category-mismatch check.
   const createUartLineHandler = useCallback(
     (onCategoryReported?: (categoryId: string) => void): UartLineHandler =>
       (line) => {
@@ -186,9 +182,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
           onCategoryReported?.(json.category);
         }
         if (json.status === "error") {
-          // A reset-triggering command was rejected (e.g. bad payload), so
-          // the MCU won't actually reset — don't treat the next disconnect
-          // (if any, e.g. the user walks out of range) as an expected reboot.
+          // Command rejected — MCU won't reset, so don't treat the next disconnect as a reboot.
           expectingResetRef.current = false;
         }
 
@@ -217,18 +211,15 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
     [appendCommandLog],
   );
 
-  // After a command that resets the MCU (set_config, set_product_uid/
-  // set_serial_number, reset_config), the BLE link drops on its own — this
-  // reconnects using the already-paired `device` object (no new picker
-  // prompt needed) once the MCU has had time to come back up.
+  // Reconnects to the already-paired device after an MCU-resetting command
+  // drops the BLE link, once the MCU has had time to boot back up.
   const reconnectAfterReset = useCallback(
     async (device: BluetoothDevice, categoryId: DeviceCategoryId) => {
       setStatus("connecting");
       setError(null);
 
-      // Same margins as provisionDevice's post-boot wait: the MCU goes
-      // through the same startup sequence (sensor init, Notehub sync) on any
-      // reset, not just first-boot setup.
+      // MCU runs the same startup sequence (sensor init, Notehub sync) on any
+      // reset, not just first-boot setup — same wait as provisionDevice.
       await sleep(5000);
 
       const deadline = Date.now() + 120000;
@@ -454,19 +445,12 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // First-time device provisioning: the firmware blocks in a setup loop until
-  // it receives setup_device (silently, no reply) followed by confirm_setup
-  // (which replies ok/error), then reboots (~15-20s) before it's usable again.
-  //
-  // This HM-10 link has been observed taking ~18s just for the confirm_setup
-  // round trip (BLE connection-interval/notification latency, not firmware
-  // processing time), so every timeout below carries generous margin rather
-  // than the firmware's own processing time.
-  //
-  // confirm_setup can reply {"status":"error","msg":"ProductUID and
-  // SerialNumber must be set first"} if setup_device's silent write never
-  // landed (e.g. dropped BLE packet) — the protocol's fix is to resend
-  // setup_device, so retry the pair a few times before giving up.
+  // Provisioning protocol: firmware blocks until it gets setup_device (silent,
+  // no reply) then confirm_setup (replies ok/error), then reboots (~15-20s).
+  // The HM-10 link can take ~18s for the confirm_setup round trip alone (BLE
+  // latency, not firmware), so timeouts below carry generous margin.
+  // confirm_setup errors "ProductUID and SerialNumber must be set first" if
+  // setup_device's silent write was dropped — retry the pair a few times.
   const MAX_SETUP_ATTEMPTS = 3;
   const provisionDevice = useCallback(
     async (

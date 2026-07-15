@@ -33,12 +33,7 @@ interface PumpThresholdPointerProps {
   onValueChange: (value: number) => void;
 }
 
-/**
- * Draggable threshold slider. Ported from a React Native version that used
- * react-native-gesture-handler + reanimated; here it's plain Pointer Events,
- * and (unlike the RN tap-vs-pan gesture split) a click always jumps the
- * thumb to the pointer position before tracking further movement.
- */
+/** Draggable threshold slider; a click always jumps the thumb to the pointer before tracking movement. */
 export function PumpThresholdPointer({
   label,
   value,
