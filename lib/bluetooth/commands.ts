@@ -16,11 +16,23 @@ export interface EchoCommand {
 export const PUMP_THRESHOLD_ADC_MIN = 0;
 export const PUMP_THRESHOLD_ADC_MAX = 4095;
 
+// Retrofit float ("dewater-pump-float") firmware-enforced numeric ranges —
+// mirrored here so the UI can clamp before round-tripping over BLE.
+export const RETROFIT_DATA_INTERVAL_SEC_MIN = 1;
+export const RETROFIT_DATA_INTERVAL_SEC_MAX = 86400;
+export const RETROFIT_SENSOR_INIT_SEC_MIN = 0;
+export const RETROFIT_SENSOR_INIT_SEC_MAX = 3600;
+export const RETROFIT_EMA_SAMPLE_MIN = 1;
+export const RETROFIT_EMA_SAMPLE_MAX = 5000;
+export const RETROFIT_SAMPLE_PERIOD_MS_MIN = 1000;
+export const RETROFIT_SAMPLE_PERIOD_MS_MAX = 86400000;
+
+function clampInt(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
 function clampAdc(value: number): number {
-  return Math.min(
-    PUMP_THRESHOLD_ADC_MAX,
-    Math.max(PUMP_THRESHOLD_ADC_MIN, Math.round(value)),
-  );
+  return clampInt(value, PUMP_THRESHOLD_ADC_MIN, PUMP_THRESHOLD_ADC_MAX);
 }
 
 /** DEWATERING — "Dewater Water Level Monitor" (dewater-water-level). */
@@ -39,13 +51,22 @@ export const dewateringCommands = {
 
 /** RETROFIT FLOAT — "Dewater Pump Float Replacement" (dewater-pump-float). */
 export const retrofitFloatCommands = {
+  /** 1–86400, persisted; also updates the live sample period. */
   setReportingIntervalSec: (seconds: number) => ({
-    set_data_e_t_sec: String(seconds),
+    set_data_e_t_sec: String(
+      clampInt(seconds, RETROFIT_DATA_INTERVAL_SEC_MIN, RETROFIT_DATA_INTERVAL_SEC_MAX),
+    ),
   }),
+  /** 0–3600, persisted. */
   setSensorInitTimeSec: (seconds: number) => ({
-    set_sensor_init_t_sec: String(seconds),
+    set_sensor_init_t_sec: String(
+      clampInt(seconds, RETROFIT_SENSOR_INIT_SEC_MIN, RETROFIT_SENSOR_INIT_SEC_MAX),
+    ),
   }),
-  setEmaSampleRate: (rate: number) => ({ set_sample: String(rate) }),
+  /** 1–5000 (EMA smoothing window), persisted. */
+  setEmaSampleRate: (rate: number) => ({
+    set_sample: String(clampInt(rate, RETROFIT_EMA_SAMPLE_MIN, RETROFIT_EMA_SAMPLE_MAX)),
+  }),
   setBleMode: (mode: "normal" | "sleep") => ({ set_ble_mode: mode }),
   resetBle: () => ({ reset_ble: "1" }),
   /** `pump` is 1–6; `adcValue` is clamped to 0–4095. */
@@ -62,7 +83,22 @@ export const retrofitFloatCommands = {
   echoPumpLowThreshold: (pump: number) => ({
     echo: `pump_${pump}_low_thr`,
   }),
+  // Flat-style identity commands — same effect as cmd-style "set_config":
+  // the MCU saves the field(s) and resets to sync with Notehub.
+  setProductUid: (uid: string) => ({ set_product_uid: uid }),
+  setSerialNumber: (serial: string) => ({ set_serial_number: serial }),
+  /** Clears stored product_uid/serial_number only; MCU resets into first-boot setup. */
+  resetConfig: () => ({ cmd: "reset_config" }),
 };
+
+// Commands whose firmware handler saves identity and then resets the MCU —
+// the BLE link is expected to drop shortly after the reply arrives.
+export function commandTriggersMcuReset(commandObj: unknown): boolean {
+  if (!commandObj || typeof commandObj !== "object") return false;
+  const obj = commandObj as Record<string, unknown>;
+  if (obj.cmd === "set_config" || obj.cmd === "reset_config") return true;
+  return "set_product_uid" in obj || "set_serial_number" in obj;
+}
 
 /**
  * VOLUMETRIC — "Conveyor Volumetric Scale" and "Pro"
@@ -97,6 +133,7 @@ const DEWATERING_ECHO_COMMANDS: EchoCommand[] = [
 ];
 
 const RETROFIT_FLOAT_ECHO_COMMANDS: EchoCommand[] = [
+  { label: "Get status", command: { cmd: "get_status" } },
   { label: "MCU firmware version", command: { echo: "embedded_software_ver" } },
   { label: "Notecard version", command: { echo: "notecard_ver" } },
   { label: "Data send interval", command: { echo: "set_data_e_t_sec" } },
@@ -174,6 +211,17 @@ const RETROFIT_FLOAT_CONFIG_COMMANDS: ConfigCommandTemplate[] = [
   { label: "BLE mode: normal", command: retrofitFloatCommands.setBleMode("normal") },
   { label: "BLE mode: sleep", command: retrofitFloatCommands.setBleMode("sleep") },
   { label: "Reset BLE module", command: retrofitFloatCommands.resetBle() },
+  // The next three reset the MCU after replying — the BLE link is expected
+  // to drop (see commandTriggersMcuReset / bluetooth-provider reconnection).
+  {
+    label: "Set product UID",
+    command: retrofitFloatCommands.setProductUid("com.company.project:product"),
+  },
+  {
+    label: "Set serial number",
+    command: retrofitFloatCommands.setSerialNumber("SN-001"),
+  },
+  { label: "Reset config", command: retrofitFloatCommands.resetConfig() },
   ...Array.from({ length: 6 }, (_, i) => i + 1).flatMap((pump) => [
     {
       label: `Pump ${pump} high (ADC)`,

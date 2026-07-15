@@ -19,8 +19,8 @@ export function SamplePeriodControl() {
 
   const handleSubmit = async () => {
     const value = parseInt(seconds, 10);
-    if (isNaN(value) || value <= 0) {
-      setStatus("Enter a valid number of seconds");
+    if (isNaN(value) || value < 1 || value > 86400) {
+      setStatus("Enter a value between 1 and 86400 seconds");
       return;
     }
 

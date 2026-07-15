@@ -11,10 +11,22 @@ import { CommandConsole } from "@/components/device/command-console";
 import { useBluetooth } from "@/context/bluetooth-provider";
 import type { CategoryDetailsProps } from "@/components/device/categories";
 import { PumpMonitoringDashboard } from "./pump-monitoring-dashboard";
+import { DeviceSetupDialog } from "./device-setup-dialog";
 
 export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
-  const { connectedDevice, readings, adcSamples } = useBluetooth();
+  const {
+    connectedDevice,
+    readings,
+    adcSamples,
+    deviceProductUid,
+    deviceSerialNumber,
+    provisionDevice,
+    disconnect,
+  } = useBluetooth();
   const samples = isConnected ? adcSamples : [];
+
+  const needsSetup =
+    isConnected && (deviceProductUid === "" || deviceSerialNumber === "");
 
   return (
     <Stack spacing={2}>
@@ -32,6 +44,11 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
       <TelemetryChart samples={samples} />
       <SamplePeriodControl />
       <CommandConsole categoryId="dewater-pump-float" />
+      <DeviceSetupDialog
+        open={needsSetup}
+        onSubmit={provisionDevice}
+        onDisconnect={disconnect}
+      />
     </Stack>
   );
 }
