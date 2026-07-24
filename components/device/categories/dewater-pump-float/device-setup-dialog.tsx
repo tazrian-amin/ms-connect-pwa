@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -24,18 +24,28 @@ const PROGRESS_MESSAGE: Record<ProvisionProgress, string> = {
 
 interface DeviceSetupDialogProps {
   open: boolean;
+  /** "setup" is the forced first-time flow; "edit" lets the user change values manually. */
+  mode?: "setup" | "edit";
+  initialProductUid?: string;
+  initialSerialNumber?: string;
   onSubmit: (
     productUid: string,
     serialNumber: string,
     onProgress: (stage: ProvisionProgress) => void,
   ) => Promise<{ ok: boolean; message?: string }>;
   onDisconnect: () => Promise<void>;
+  /** Called to dismiss the dialog in edit mode (Cancel / backdrop / success). */
+  onClose?: () => void;
 }
 
 export function DeviceSetupDialog({
   open,
+  mode = "setup",
+  initialProductUid = "",
+  initialSerialNumber = "",
   onSubmit,
   onDisconnect,
+  onClose,
 }: DeviceSetupDialogProps) {
   const [productUid, setProductUid] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
@@ -43,6 +53,20 @@ export function DeviceSetupDialog({
   const [progress, setProgress] = useState<ProvisionProgress | null>(null);
 
   const isWorking = progress !== null;
+  const isEdit = mode === "edit";
+
+  // Seed the fields from the current device values when the dialog opens. Keyed
+  // on the open transition so a background config update can't overwrite input
+  // while the user is editing.
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (open && !wasOpenRef.current) {
+      setProductUid(initialProductUid);
+      setSerialNumber(initialSerialNumber);
+      setError(null);
+    }
+    wasOpenRef.current = open;
+  }, [open, initialProductUid, initialSerialNumber]);
 
   const handleSubmit = async () => {
     const uid = productUid.trim();
@@ -61,18 +85,26 @@ export function DeviceSetupDialog({
     const result = await onSubmit(uid, sn, setProgress);
     setProgress(null);
 
-    if (!result.ok) {
+    if (result.ok) {
+      onClose?.();
+    } else {
       setError(result.message ?? "Setup failed. Please try again.");
     }
   };
 
   return (
-    <Dialog open={open} maxWidth="xs" fullWidth>
-      <DialogTitle>Device Setup Required</DialogTitle>
+    <Dialog
+      open={open}
+      maxWidth="xs"
+      fullWidth
+      onClose={isEdit && !isWorking ? onClose : undefined}
+    >
+      <DialogTitle>{isEdit ? "Edit Device Settings" : "Device Setup Required"}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          This device hasn&apos;t been configured yet. Enter the Product UID and
-          Serial Number to complete first-time setup.
+          {isEdit
+            ? "Update the Product UID and Serial Number stored on the device."
+            : "This device hasn't been configured yet. Enter the Product UID and Serial Number to complete first-time setup."}
         </Typography>
 
         <Stack spacing={2}>
@@ -111,11 +143,17 @@ export function DeviceSetupDialog({
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onDisconnect} color="secondary" disabled={isWorking}>
-          Disconnect
-        </Button>
+        {isEdit ? (
+          <Button onClick={onClose} color="secondary" disabled={isWorking}>
+            Cancel
+          </Button>
+        ) : (
+          <Button onClick={onDisconnect} color="secondary" disabled={isWorking}>
+            Disconnect
+          </Button>
+        )}
         <Button onClick={handleSubmit} variant="contained" loading={isWorking}>
-          Save &amp; Continue
+          {isEdit ? "Save" : "Save & Continue"}
         </Button>
       </DialogActions>
     </Dialog>

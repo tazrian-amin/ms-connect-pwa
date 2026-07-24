@@ -89,6 +89,11 @@ interface BluetoothContextValue {
     serialNumber: string,
     onProgress?: (stage: ProvisionProgress) => void,
   ) => Promise<ProvisionResult>;
+  updateDeviceIdentity: (
+    productUid: string,
+    serialNumber: string,
+    onProgress?: (stage: ProvisionProgress) => void,
+  ) => Promise<ProvisionResult>;
 }
 
 const BluetoothContext = createContext<BluetoothContextValue | null>(null);
@@ -130,6 +135,21 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
   // Marks the next disconnect as an expected reboot (not a lost connection).
   // Set before MCU-resetting commands; cleared on error reply or once consumed.
   const expectingResetRef = useRef(false);
+
+  // Mirror live connection state into refs so async flows (updateDeviceIdentity)
+  // can poll the latest values instead of capturing stale state in a closure.
+  const statusRef = useRef<ConnectionStatus>("idle");
+  const productUidRef = useRef<string | null>(null);
+  const serialNumberRef = useRef<string | null>(null);
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+  useEffect(() => {
+    productUidRef.current = deviceProductUid;
+  }, [deviceProductUid]);
+  useEffect(() => {
+    serialNumberRef.current = deviceSerialNumber;
+  }, [deviceSerialNumber]);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -551,6 +571,79 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
     [sendCommand, waitForReply],
   );
 
+  // Runtime identity change for an already-provisioned device. Firmware
+  // (main.cpp tryHandleFlatIdentityCommand) saves the field(s) to EEPROM, syncs
+  // Notehub, then NVIC_SystemReset()s -- which drops the BLE link. sendCommand
+  // flags the reset (commandTriggersMcuReset) so handleDisconnect auto-reconnects
+  // via reconnectAfterReset, which re-reads get_config; we wait for that to
+  // report the new identity, then resolve so the caller's loader can finish.
+  const updateDeviceIdentity = useCallback(
+    async (
+      productUid: string,
+      serialNumber: string,
+      onProgress?: (stage: ProvisionProgress) => void,
+    ): Promise<ProvisionResult> => {
+      if (!rxCharacteristicRef.current) {
+        return { ok: false, message: "Not connected to a device." };
+      }
+
+      onProgress?.("sending");
+      const ackReply = waitForReply(
+        (json) => typeof json.status === "string",
+        15000,
+      );
+      // Flat identity write; firmware accepts both fields in one message.
+      await sendCommand({
+        set_product_uid: productUid,
+        set_serial_number: serialNumber,
+      });
+      const ack = await ackReply;
+      if (ack && ack.status === "error") {
+        return {
+          ok: false,
+          message:
+            typeof ack.msg === "string" ? ack.msg : "Device rejected the update.",
+        };
+      }
+
+      onProgress?.("rebooting");
+      // Wait for the hard reset to drop the link (firmware syncs Notehub ~6s
+      // before NVIC_SystemReset). Also guards the no-op case where the submitted
+      // values already match, so we don't resolve before the reboot happens.
+      const dropDeadline = Date.now() + 30000;
+      while (rxCharacteristicRef.current && Date.now() < dropDeadline) {
+        await sleep(500);
+      }
+
+      // Then wait for the automatic reconnect's get_config to report the new
+      // identity (~30-60s: MCU boot + Notecard sync + BLE reconnect).
+      const deadline = Date.now() + 180000;
+      while (Date.now() < deadline) {
+        if (
+          statusRef.current === "connected" &&
+          productUidRef.current === productUid &&
+          serialNumberRef.current === serialNumber
+        ) {
+          return { ok: true };
+        }
+        if (statusRef.current === "disconnected") {
+          return {
+            ok: false,
+            message:
+              "Device restarted but didn't reconnect automatically. Reconnect manually.",
+          };
+        }
+        await sleep(1000);
+      }
+
+      return {
+        ok: false,
+        message: "Timed out waiting for the device to restart. It may still be rebooting.",
+      };
+    },
+    [sendCommand, waitForReply],
+  );
+
   const disconnect = useCallback(async () => {
     if (connectedDevice) {
       await disconnectDevice(connectedDevice.device);
@@ -581,6 +674,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       deviceProductUid,
       deviceSerialNumber,
       provisionDevice,
+      updateDeviceIdentity,
     }),
     [
       supportMessage,
@@ -603,6 +697,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       deviceProductUid,
       deviceSerialNumber,
       provisionDevice,
+      updateDeviceIdentity,
     ],
   );
 
