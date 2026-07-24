@@ -77,7 +77,14 @@ export async function sendUartCommand(
     offset += MAX_BLE_WRITE_CHUNK_BYTES
   ) {
     const chunk = bytes.slice(offset, offset + MAX_BLE_WRITE_CHUNK_BYTES);
-    if (characteristic.properties.writeWithoutResponse) {
+    // Prefer write-with-response: it waits for a GATT ack from the module and
+    // throws if the peripheral rejects/drops it. writeValueWithoutResponse is
+    // fire-and-forget at the radio layer — some HM-10 clones accept it (and
+    // the browser promise resolves cleanly) without ever forwarding the bytes
+    // to the UART, which silently drops every outbound command.
+    if (characteristic.properties.write) {
+      await characteristic.writeValue(chunk);
+    } else if (characteristic.properties.writeWithoutResponse) {
       await characteristic.writeValueWithoutResponse(chunk);
     } else {
       await characteristic.writeValue(chunk);

@@ -30,29 +30,18 @@ export function waterLevelToTopSegmentIndex(waterLevel: number) {
 }
 
 /**
- * Pump runs when water is outside the band between LOW and HIGH thresholds
- * (the same grey LED zone between the sliders).
+ * Stateless preview of the firmware's pump control for disconnected/demo
+ * mode: on once the water level has risen above the real HIGH trigger point.
+ * Mirrors the firmware's effectivePumpHighThreshold() mapping (top half of
+ * the water-level range), but — unlike the firmware's hysteresis, which also
+ * needs the LOW trigger to decide when to turn back off — has no memory of a
+ * prior state to hold onto, so LOW plays no part here. A water level at or
+ * below the HIGH trigger (e.g. an empty/0% reading) always reads as OFF.
  */
-export function isPumpOn(
-  waterLevel: number,
-  triggerLevelLow: number,
-  triggerLevelHigh: number,
-): boolean {
-  const lowBoundary = getLowThresholdBoundaryIndex(triggerLevelLow);
-  const highBoundary = getHighThresholdBoundaryIndex(triggerLevelHigh);
-
-  if (lowBoundary >= highBoundary) {
-    return true;
-  }
-
-  const waterTop = waterLevelToTopSegmentIndex(waterLevel);
-  if (waterTop < 0) {
-    return true;
-  }
-
-  const inThresholdBand =
-    waterTop >= lowBoundary && waterTop < highBoundary;
-  return !inThresholdBand;
+export function isPumpOn(waterLevel: number, triggerLevelHigh: number): boolean {
+  const water = clampPercent(waterLevel);
+  const realHigh = 50 + clampPercent(triggerLevelHigh) / 2;
+  return water > realHigh;
 }
 
 /**

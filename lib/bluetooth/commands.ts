@@ -11,8 +11,13 @@ export interface EchoCommand {
   command: Record<string, string>;
 }
 
-export const PUMP_THRESHOLD_ADC_MIN = 0;
-export const PUMP_THRESHOLD_ADC_MAX = 4095;
+// Pump high/low settings are a raw 0-100 setting, not an ADC value — the
+// firmware maps this internally to a real current_water_level trigger point
+// (HIGH -> upper half 50-100%, LOW -> lower half 0-50%), which matches the
+// PWA slider's own per-zone 0-100 scale 1:1. See dewater-pump-float firmware
+// README "Pump ON/OFF control".
+export const PUMP_THRESHOLD_PERCENT_MIN = 0;
+export const PUMP_THRESHOLD_PERCENT_MAX = 100;
 
 // Retrofit float ("dewater-pump-float") firmware-enforced numeric ranges —
 // mirrored here so the UI can clamp before round-tripping over BLE.
@@ -29,8 +34,8 @@ function clampInt(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)));
 }
 
-function clampAdc(value: number): number {
-  return clampInt(value, PUMP_THRESHOLD_ADC_MIN, PUMP_THRESHOLD_ADC_MAX);
+function clampPumpThreshold(value: number): number {
+  return clampInt(value, PUMP_THRESHOLD_PERCENT_MIN, PUMP_THRESHOLD_PERCENT_MAX);
 }
 
 /** DEWATERING — "Dewater Water Level Monitor" (dewater-water-level). */
@@ -67,13 +72,13 @@ export const retrofitFloatCommands = {
   }),
   setBleMode: (mode: "normal" | "sleep") => ({ set_ble_mode: mode }),
   resetBle: () => ({ reset_ble: "1" }),
-  /** `pump` is 1–6; `adcValue` is clamped to 0–4095. */
-  setPumpHighThreshold: (pump: number, adcValue: number) => ({
-    [`pump_${pump}_set_high`]: String(clampAdc(adcValue)),
+  /** `pump` is 1–6; `percent` (0–100, the raw setting shown on the PWA slider) is clamped 0–100. */
+  setPumpHighThreshold: (pump: number, percent: number) => ({
+    [`pump_${pump}_set_high`]: String(clampPumpThreshold(percent)),
   }),
-  /** `pump` is 1–6; `adcValue` is clamped to 0–4095. */
-  setPumpLowThreshold: (pump: number, adcValue: number) => ({
-    [`pump_${pump}_set_low`]: String(clampAdc(adcValue)),
+  /** `pump` is 1–6; `percent` (0–100, the raw setting shown on the PWA slider) is clamped 0–100. */
+  setPumpLowThreshold: (pump: number, percent: number) => ({
+    [`pump_${pump}_set_low`]: String(clampPumpThreshold(percent)),
   }),
   echoPumpHighThreshold: (pump: number) => ({
     echo: `pump_${pump}_high_thr`,
@@ -222,12 +227,12 @@ const RETROFIT_FLOAT_CONFIG_COMMANDS: ConfigCommandTemplate[] = [
   { label: "Reset config", command: retrofitFloatCommands.resetConfig() },
   ...Array.from({ length: 6 }, (_, i) => i + 1).flatMap((pump) => [
     {
-      label: `Pump ${pump} high (ADC)`,
-      command: retrofitFloatCommands.setPumpHighThreshold(pump, 2500),
+      label: `Pump ${pump} high (%)`,
+      command: retrofitFloatCommands.setPumpHighThreshold(pump, 65),
     },
     {
-      label: `Pump ${pump} low (ADC)`,
-      command: retrofitFloatCommands.setPumpLowThreshold(pump, 1000),
+      label: `Pump ${pump} low (%)`,
+      command: retrofitFloatCommands.setPumpLowThreshold(pump, 30),
     },
   ]),
 ];

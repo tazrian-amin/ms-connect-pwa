@@ -7,12 +7,11 @@ import Typography from "@mui/material/Typography";
 
 import { PumpMonitoringPalette } from "./constants";
 import { PumpLevelGauge } from "./pump-level-gauge";
-import { isPumpOn } from "./pump-led-threshold-logic";
 import type { PumpStatus } from "./types";
 
 interface PumpColumnProps {
   pump: PumpStatus;
-  waterLevel: number;
+  isOn: boolean;
   onResetRuntime: (pumpId: number) => void;
   onTriggerLevelHighChange: (pumpId: number, level: number) => void;
   onTriggerLevelLowChange: (pumpId: number, level: number) => void;
@@ -57,13 +56,11 @@ function StatusIndicator({
 
 export function PumpColumn({
   pump,
-  waterLevel,
+  isOn,
   onResetRuntime,
   onTriggerLevelHighChange,
   onTriggerLevelLowChange,
 }: PumpColumnProps) {
-  const pumpIsOn = isPumpOn(waterLevel, pump.triggerLevelLow, pump.triggerLevelHigh);
-
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 100 }}>
       <Typography sx={{ color: PumpMonitoringPalette.text, fontSize: 16, fontWeight: 600, mb: 1.5 }}>
@@ -78,8 +75,8 @@ export function PumpColumn({
       />
 
       <Stack spacing={1} sx={{ mt: 2, width: "100%" }}>
-        <StatusIndicator label="ON" active={pumpIsOn} activeColor={PumpMonitoringPalette.greenActive} />
-        <StatusIndicator label="OFF" active={!pumpIsOn} activeColor={PumpMonitoringPalette.redActive} />
+        <StatusIndicator label="ON" active={isOn} activeColor={PumpMonitoringPalette.greenActive} />
+        <StatusIndicator label="OFF" active={!isOn} activeColor={PumpMonitoringPalette.redActive} />
       </Stack>
 
       <Stack

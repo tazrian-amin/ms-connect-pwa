@@ -169,8 +169,13 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
         if (!json) return;
 
         appendCommandLog("in", JSON.stringify(json));
+        // set_sample_period's own reply uses "period_ms"; get_config/get_status
+        // report the same value as "sample_period_ms" — firmware uses both names
+        // depending on which command triggered the reply.
         if (typeof json.period_ms === "number") {
           setSamplePeriodMs(json.period_ms);
+        } else if (typeof json.sample_period_ms === "number") {
+          setSamplePeriodMs(json.sample_period_ms);
         }
         if (typeof json.product_uid === "string") {
           setDeviceProductUid(json.product_uid);
