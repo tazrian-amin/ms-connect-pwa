@@ -19,6 +19,7 @@ import type {
   DeviceCategory,
   DeviceCategoryId,
   DeviceReading,
+  PumpRuntime,
 } from "@/types/bluetooth";
 import {
   connectToDevice,
@@ -39,6 +40,8 @@ import {
 
 // Safety cap on retained ADC history to bound memory over long sessions.
 const MAX_ADC_SAMPLES = 1000;
+// Same bound for the derived water-level history (see waterLevelSamples).
+const MAX_WATER_LEVEL_SAMPLES = 1000;
 
 // Turns a firmware JSON field name (e.g. "flow_rate_lpm") into a display label.
 function humanizeKey(key: string): string {
@@ -75,6 +78,14 @@ interface BluetoothContextValue {
   disconnect: () => Promise<void>;
   clearError: () => void;
   adcSamples: AdcSample[];
+  // Time-series of the firmware's current_water_level (%), accumulated from the
+  // periodic JSON reports so the telemetry chart can plot it over time. `readings`
+  // only ever holds the latest value per key, so it can't back a chart on its own.
+  waterLevelSamples: AdcSample[];
+  // Per-pump runtime, keyed by pump id (1-based), accumulated from the firmware's
+  // pump_N_state transitions. See PumpRuntime for the total-runtime formula.
+  pumpRuntimes: Record<number, PumpRuntime>;
+  resetPumpRuntime: (pumpId: number) => void;
   commandLog: CommandLogEntry[];
   samplePeriodMs: number | null;
   sendCommand: (commandObj: unknown) => Promise<void>;
@@ -120,6 +131,10 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
   const [selectedCategory, setSelectedCategory] =
     useState<DeviceCategory | null>(null);
   const [adcSamples, setAdcSamples] = useState<AdcSample[]>([]);
+  const [waterLevelSamples, setWaterLevelSamples] = useState<AdcSample[]>([]);
+  const [pumpRuntimes, setPumpRuntimes] = useState<Record<number, PumpRuntime>>(
+    {},
+  );
   const [commandLog, setCommandLog] = useState<CommandLogEntry[]>([]);
   const [samplePeriodMs, setSamplePeriodMs] = useState<number | null>(null);
   const [deviceProductUid, setDeviceProductUid] = useState<string | null>(null);
@@ -169,6 +184,23 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
 
   const clearCommandLog = useCallback(() => setCommandLog([]), []);
 
+  // Zeroes a pump's accumulated runtime; if it's currently ON, restarts the
+  // running interval from now so the live counter continues from 0.
+  const resetPumpRuntime = useCallback((pumpId: number) => {
+    setPumpRuntimes((prev) => {
+      const current = prev[pumpId];
+      if (!current) return prev;
+      return {
+        ...prev,
+        [pumpId]: {
+          isOn: current.isOn,
+          accumulatedSeconds: 0,
+          onSinceEpoch: current.isOn ? Date.now() / 1000 : null,
+        },
+      };
+    });
+  }, []);
+
   // Shared by initial connect and post-reset reconnection; onCategoryReported
   // is only used for the initial connect's category-mismatch check.
   const createUartLineHandler = useCallback(
@@ -197,6 +229,67 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
         } else if (typeof json.sample_period_ms === "number") {
           setSamplePeriodMs(json.sample_period_ms);
         }
+        // The firmware stamps each water-level / pump-state report with a device
+        // `time` (Unix seconds from the Notecard clock), or null before that
+        // clock is set — fall back to the browser clock only then.
+        const eventEpochSeconds =
+          typeof json.time === "number" && Number.isFinite(json.time)
+            ? json.time
+            : null;
+        const eventTimestamp =
+          eventEpochSeconds !== null
+            ? new Date(eventEpochSeconds * 1000)
+            : new Date();
+        const eventSeconds = eventEpochSeconds ?? Date.now() / 1000;
+
+        if (json.current_water_level !== undefined) {
+          const waterLevel = Number(json.current_water_level);
+          if (Number.isFinite(waterLevel)) {
+            setWaterLevelSamples((prev) => {
+              const next = [...prev, { timestamp: eventTimestamp, value: waterLevel }];
+              return next.length > MAX_WATER_LEVEL_SAMPLES
+                ? next.slice(next.length - MAX_WATER_LEVEL_SAMPLES)
+                : next;
+            });
+          }
+        }
+
+        // pump_N_state is edge-triggered: each push is an actual ON/OFF flip, so
+        // we close out the previous ON interval into accumulatedSeconds using the
+        // device timestamps and start/stop the running interval accordingly.
+        for (const [key, val] of Object.entries(json)) {
+          const pumpMatch = key.match(/^pump_(\d+)_state$/);
+          if (!pumpMatch) continue;
+          const pumpId = Number(pumpMatch[1]);
+          const nextOn = val === "on";
+          setPumpRuntimes((prev) => {
+            const current = prev[pumpId] ?? {
+              isOn: false,
+              accumulatedSeconds: 0,
+              onSinceEpoch: null,
+            };
+            if (nextOn === current.isOn) return prev;
+            if (nextOn) {
+              return {
+                ...prev,
+                [pumpId]: { ...current, isOn: true, onSinceEpoch: eventSeconds },
+              };
+            }
+            const runtimeToAdd =
+              current.onSinceEpoch !== null
+                ? Math.max(0, eventSeconds - current.onSinceEpoch)
+                : 0;
+            return {
+              ...prev,
+              [pumpId]: {
+                isOn: false,
+                accumulatedSeconds: current.accumulatedSeconds + runtimeToAdd,
+                onSinceEpoch: null,
+              },
+            };
+          });
+        }
+
         if (typeof json.product_uid === "string") {
           setDeviceProductUid(json.product_uid);
         }
@@ -295,6 +388,8 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
     setConnectedDevice(null);
     setReadings([]);
     setAdcSamples([]);
+    setWaterLevelSamples([]);
+    setPumpRuntimes({});
     setCommandLog([]);
     setSamplePeriodMs(null);
     setDeviceProductUid(null);
@@ -348,6 +443,8 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
         setConnectedDevice(connected);
         setReadings([]);
         setAdcSamples([]);
+        setWaterLevelSamples([]);
+        setPumpRuntimes({});
         setCommandLog([]);
         setSamplePeriodMs(null);
         setDeviceProductUid(null);
@@ -665,6 +762,9 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       disconnect,
       clearError,
       adcSamples,
+      waterLevelSamples,
+      pumpRuntimes,
+      resetPumpRuntime,
       commandLog,
       samplePeriodMs,
       sendCommand,
@@ -688,6 +788,9 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       disconnect,
       clearError,
       adcSamples,
+      waterLevelSamples,
+      pumpRuntimes,
+      resetPumpRuntime,
       commandLog,
       samplePeriodMs,
       sendCommand,

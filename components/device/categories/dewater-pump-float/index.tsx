@@ -19,14 +19,14 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
   const {
     connectedDevice,
     readings,
-    adcSamples,
+    waterLevelSamples,
     deviceProductUid,
     deviceSerialNumber,
     provisionDevice,
     updateDeviceIdentity,
     disconnect,
   } = useBluetooth();
-  const samples = isConnected ? adcSamples : [];
+  const samples = isConnected ? waterLevelSamples : [];
   const [editOpen, setEditOpen] = useState(false);
 
   const needsSetup =
@@ -63,7 +63,14 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
           <PumpMonitoringDashboard />
         </CardContent>
       </Card>
-      <TelemetryChart samples={samples} />
+      <TelemetryChart
+        samples={samples}
+        title="Water Level Telemetry"
+        seriesLabel="Water Level"
+        unit="%"
+        yDomain={[0, 100]}
+        emptyMessage="Waiting for water level readings from the device..."
+      />
       <SamplePeriodControl />
       <CommandConsole categoryId="dewater-pump-float" />
       <DeviceSetupDialog

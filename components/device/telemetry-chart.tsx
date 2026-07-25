@@ -10,6 +10,16 @@ import type { AdcSample } from "@/types/bluetooth";
 
 interface TelemetryChartProps {
   samples: AdcSample[];
+  /** Card heading. Defaults to the raw-ADC telemetry wording. */
+  title?: string;
+  /** Legend label for the plotted series. */
+  seriesLabel?: string;
+  /** Shown while no samples have arrived yet. */
+  emptyMessage?: string;
+  /** Unit suffix appended to values in the y-axis ticks and tooltip (e.g. "%"). */
+  unit?: string;
+  /** Fixes the y-axis to a known range (e.g. [0, 100] for a percentage). */
+  yDomain?: [number, number];
 }
 
 const CHART_HEIGHT = 300;
@@ -52,7 +62,14 @@ function downsampleMinMax(samples: AdcSample[], maxPoints: number): AdcSample[] 
   return result;
 }
 
-export function TelemetryChart({ samples }: TelemetryChartProps) {
+export function TelemetryChart({
+  samples,
+  title = "Live Telemetry",
+  seriesLabel = "Raw ADC Value",
+  emptyMessage = "Waiting for ADC readings from the device...",
+  unit,
+  yDomain,
+}: TelemetryChartProps) {
   const [width, setWidth] = useState(0);
   const observerRef = useRef<ResizeObserver | null>(null);
   
@@ -84,16 +101,19 @@ export function TelemetryChart({ samples }: TelemetryChartProps) {
   );
   const values = displaySamples.map((sample) => sample.value);
 
+  const formatValue = (value: number | null) =>
+    value === null ? "" : `${value}${unit ?? ""}`;
+
   return (
     <Card variant="outlined">
       <CardContent>
         <Typography variant="h6" component="h2" gutterBottom>
-          Live Telemetry
+          {title}
         </Typography>
 
         {samples.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            Waiting for ADC readings from the device...
+            {emptyMessage}
           </Typography>
         ) : (
           <Box ref={containerRef} sx={{ width: "100%", height: CHART_HEIGHT }}>
@@ -102,7 +122,7 @@ export function TelemetryChart({ samples }: TelemetryChartProps) {
                 width={width}
                 height={CHART_HEIGHT}
                 series={[
-                  { id: "raw", data: values, label: "Raw ADC Value" },
+                  { id: "raw", data: values, label: seriesLabel, valueFormatter: formatValue },
                   ...(average !== null
                     ? [
                         {
@@ -111,12 +131,20 @@ export function TelemetryChart({ samples }: TelemetryChartProps) {
                           label: "Average",
                           color: "#ef4444",
                           showMark: false,
+                          valueFormatter: formatValue,
                         },
                       ]
                     : []),
                 ]}
                 xAxis={[{ scaleType: "point", data: xLabels, height: 28 }]}
-                yAxis={[{ width: 50 }]}
+                yAxis={[
+                  {
+                    width: 50,
+                    min: yDomain?.[0],
+                    max: yDomain?.[1],
+                    valueFormatter: unit ? (value: number) => `${value}${unit}` : undefined,
+                  },
+                ]}
                 grid={{ horizontal: true }}
                 margin={{ right: 24 }}
                 skipAnimation

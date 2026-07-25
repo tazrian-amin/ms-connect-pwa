@@ -52,6 +52,17 @@ export interface AdcSample {
   value: number;
 }
 
+// Per-pump runtime accumulator, derived from the firmware's edge-triggered
+// pump_N_state pushes (each carries a device `time` in Unix seconds). Total
+// runtime = accumulatedSeconds + (isOn ? now - onSinceEpoch : 0).
+export interface PumpRuntime {
+  isOn: boolean;
+  /** Total completed ON→OFF runtime observed this session, in seconds. */
+  accumulatedSeconds: number;
+  /** Unix seconds when the current ON interval began; null while off. */
+  onSinceEpoch: number | null;
+}
+
 export interface CommandLogEntry {
   id: string;
   direction: "out" | "in";

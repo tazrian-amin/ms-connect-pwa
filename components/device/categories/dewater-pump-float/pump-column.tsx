@@ -12,6 +12,8 @@ import type { PumpStatus } from "./types";
 interface PumpColumnProps {
   pump: PumpStatus;
   isOn: boolean;
+  /** Preformatted total runtime, e.g. "1h 05m" or "12s". */
+  runtimeLabel: string;
   onResetRuntime: (pumpId: number) => void;
   onTriggerLevelHighChange: (pumpId: number, level: number) => void;
   onTriggerLevelLowChange: (pumpId: number, level: number) => void;
@@ -57,6 +59,7 @@ function StatusIndicator({
 export function PumpColumn({
   pump,
   isOn,
+  runtimeLabel,
   onResetRuntime,
   onTriggerLevelHighChange,
   onTriggerLevelLowChange,
@@ -92,8 +95,8 @@ export function PumpColumn({
         }}
       >
         <Typography sx={{ color: PumpMonitoringPalette.textMuted, fontSize: 12 }}>Runtime</Typography>
-        <Typography sx={{ color: PumpMonitoringPalette.text, fontSize: 22, fontWeight: 700, letterSpacing: 0.5 }}>
-          {pump.runtimeHours}h
+        <Typography sx={{ color: PumpMonitoringPalette.text, fontSize: 20, fontWeight: 700, letterSpacing: 0.5 }}>
+          {runtimeLabel}
         </Typography>
         <Button
           size="small"
