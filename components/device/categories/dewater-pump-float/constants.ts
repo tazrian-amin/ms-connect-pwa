@@ -61,5 +61,12 @@ export const THRESHOLD_MARKER_HEIGHT = 2;
 /** Kept between the two label pills once the thresholds converge. */
 export const THRESHOLD_POINTER_MIN_GAP = 2;
 
+/**
+ * Water column's own trigger band. Held in the UI only — the retrofit float
+ * command set has no key for it yet — so these are where it starts.
+ */
+export const WATER_TRIGGER_LEVEL_HIGH_DEFAULT = 75;
+export const WATER_TRIGGER_LEVEL_LOW_DEFAULT = 25;
+
 export const DASHBOARD_MIN_WIDTH = 920;
 export const COLUMN_GAP = 20;

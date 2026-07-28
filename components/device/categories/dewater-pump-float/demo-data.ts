@@ -15,10 +15,5 @@ export function createDemoPumpMonitoringData(): PumpMonitoringData {
     };
   });
 
-  return {
-    waterLevel,
-    waterTriggerLevelHigh: 75,
-    waterTriggerLevelLow: 25,
-    pumps,
-  };
+  return { waterLevel, pumps };
 }

@@ -9,9 +9,6 @@ export type PumpStatus = {
 
 export type PumpMonitoringData = {
   waterLevel: number;
-  /** Water column's own trigger band, independent of the per-pump triggers. */
-  waterTriggerLevelHigh: number;
-  waterTriggerLevelLow: number;
   pumps: PumpStatus[];
 };
 

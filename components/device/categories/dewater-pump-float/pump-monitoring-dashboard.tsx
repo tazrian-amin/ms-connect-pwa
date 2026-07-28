@@ -16,6 +16,14 @@ import { WaterLevelColumn } from "./water-level-column";
 
 interface PumpMonitoringDashboardProps {
   data?: PumpMonitoringData;
+  /**
+   * The water column's own trigger band. Owned by the parent because the
+   * telemetry chart marks the same two levels.
+   */
+  waterTriggerLevelHigh: number;
+  waterTriggerLevelLow: number;
+  onWaterTriggerLevelHighChange: (level: number) => void;
+  onWaterTriggerLevelLowChange: (level: number) => void;
 }
 
 // The firmware pushes these as plain JSON keys (see bluetooth-provider's
@@ -55,6 +63,10 @@ function formatRuntime(totalSeconds: number): string {
 
 export function PumpMonitoringDashboard({
   data: dataProp,
+  waterTriggerLevelHigh,
+  waterTriggerLevelLow,
+  onWaterTriggerLevelHighChange,
+  onWaterTriggerLevelLowChange,
 }: PumpMonitoringDashboardProps) {
   const { status, sendCommand, readings, pumpRuntimes, resetPumpRuntime } =
     useBluetooth();
@@ -117,18 +129,6 @@ export function PumpMonitoringDashboard({
     },
     [isConnected, sendCommand],
   );
-
-  // The water column's own trigger band is UI-only for now: the retrofit
-  // float command set has no key for it, so the value is held locally and
-  // nothing goes over BLE. Once the firmware names one, send it here the same
-  // way setTriggerLevelHigh/Low below do.
-  const setWaterTriggerLevelHigh = useCallback((level: number) => {
-    setData((prev) => ({ ...prev, waterTriggerLevelHigh: level }));
-  }, []);
-
-  const setWaterTriggerLevelLow = useCallback((level: number) => {
-    setData((prev) => ({ ...prev, waterTriggerLevelLow: level }));
-  }, []);
 
   const setTriggerLevelHigh = useCallback(
     (pumpId: number, level: number) => {
@@ -194,10 +194,10 @@ export function PumpMonitoringDashboard({
           >
             <WaterLevelColumn
               waterLevel={waterLevel}
-              triggerLevelHigh={data.waterTriggerLevelHigh}
-              triggerLevelLow={data.waterTriggerLevelLow}
-              onTriggerLevelHighChange={setWaterTriggerLevelHigh}
-              onTriggerLevelLowChange={setWaterTriggerLevelLow}
+              triggerLevelHigh={waterTriggerLevelHigh}
+              triggerLevelLow={waterTriggerLevelLow}
+              onTriggerLevelHighChange={onWaterTriggerLevelHighChange}
+              onTriggerLevelLowChange={onWaterTriggerLevelLowChange}
             />
             <Box
               sx={{

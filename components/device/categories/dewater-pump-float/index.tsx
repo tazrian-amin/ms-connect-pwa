@@ -12,6 +12,11 @@ import { CommandConsole } from "@/components/device/command-console";
 import { useBluetooth } from "@/context/bluetooth-provider";
 import type { ProvisionProgress } from "@/context/bluetooth-provider";
 import type { CategoryDetailsProps } from "@/components/device/categories";
+import {
+  PumpMonitoringPalette,
+  WATER_TRIGGER_LEVEL_HIGH_DEFAULT,
+  WATER_TRIGGER_LEVEL_LOW_DEFAULT,
+} from "./constants";
 import { PumpMonitoringDashboard } from "./pump-monitoring-dashboard";
 import { DeviceSetupDialog } from "./device-setup-dialog";
 
@@ -28,6 +33,15 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
   } = useBluetooth();
   const samples = isConnected ? waterLevelSamples : [];
   const [editOpen, setEditOpen] = useState(false);
+
+  // Shared by the water level column (which sets them) and the telemetry
+  // chart (which marks them), so they live here rather than in either one.
+  const [waterTriggerLevelHigh, setWaterTriggerLevelHigh] = useState(
+    WATER_TRIGGER_LEVEL_HIGH_DEFAULT,
+  );
+  const [waterTriggerLevelLow, setWaterTriggerLevelLow] = useState(
+    WATER_TRIGGER_LEVEL_LOW_DEFAULT,
+  );
 
   const needsSetup =
     isConnected && (deviceProductUid === "" || deviceSerialNumber === "");
@@ -60,7 +74,12 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
           <Typography variant="h6" component="h2" gutterBottom>
             Pump Monitoring
           </Typography>
-          <PumpMonitoringDashboard />
+          <PumpMonitoringDashboard
+            waterTriggerLevelHigh={waterTriggerLevelHigh}
+            waterTriggerLevelLow={waterTriggerLevelLow}
+            onWaterTriggerLevelHighChange={setWaterTriggerLevelHigh}
+            onWaterTriggerLevelLowChange={setWaterTriggerLevelLow}
+          />
         </CardContent>
       </Card>
       <TelemetryChart
@@ -70,6 +89,19 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
         unit="%"
         yDomain={[0, 100]}
         emptyMessage="Waiting for water level readings from the device..."
+        showAverage={false}
+        referenceLines={[
+          {
+            value: waterTriggerLevelHigh,
+            label: "High Threshold",
+            color: PumpMonitoringPalette.redActive,
+          },
+          {
+            value: waterTriggerLevelLow,
+            label: "Low Threshold",
+            color: PumpMonitoringPalette.redActive,
+          },
+        ]}
       />
       <SamplePeriodControl />
       <CommandConsole categoryId="dewater-pump-float" />
