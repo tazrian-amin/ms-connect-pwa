@@ -70,3 +70,15 @@ export const WATER_TRIGGER_LEVEL_LOW_DEFAULT = 25;
 
 export const DASHBOARD_MIN_WIDTH = 920;
 export const COLUMN_GAP = 20;
+
+/**
+ * Height of the pump ON/OFF pill. Fixed so the water column can reserve the
+ * same space and keep every gauge top-aligned.
+ */
+export const STATUS_INDICATOR_HEIGHT = 42;
+
+/** Height of the enable/disable switch row above each pump title, same reason. */
+export const PUMP_TOGGLE_HEIGHT = 30;
+
+/** Dimming applied to a disabled pump column's readouts and gauge. */
+export const PUMP_DISABLED_OPACITY = 0.5;

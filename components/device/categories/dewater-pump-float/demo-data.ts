@@ -9,9 +9,11 @@ export function createDemoPumpMonitoringData(): PumpMonitoringData {
     const id = pumpIndex + 1;
     return {
       id,
+      enabled: true,
       triggerLevelHigh: 50,
       triggerLevelLow: 25,
       runtimeHours: 0,
+      totalRuntimeHours: 0,
     };
   });
 

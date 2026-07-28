@@ -80,11 +80,22 @@ export const retrofitFloatCommands = {
   setPumpLowThreshold: (pump: number, percent: number) => ({
     [`pump_${pump}_set_low`]: String(clampPumpThreshold(percent)),
   }),
+  /**
+   * `pump` is 1–6. UPCOMING FIRMWARE FEATURE — key name is provisional.
+   * Disabling also turns the pump off firmware-side, so the PWA never has to
+   * send a separate stop; the enabled flag is persisted across reboots.
+   */
+  setPumpEnabled: (pump: number, enabled: boolean) => ({
+    [`pump_${pump}_set_enable`]: enabled ? "1" : "0",
+  }),
   echoPumpHighThreshold: (pump: number) => ({
     echo: `pump_${pump}_high_thr`,
   }),
   echoPumpLowThreshold: (pump: number) => ({
     echo: `pump_${pump}_low_thr`,
+  }),
+  echoPumpEnabled: (pump: number) => ({
+    echo: `pump_${pump}_enabled`,
   }),
   // Flat-style identity commands — same effect as cmd-style "set_config":
   // the MCU saves the field(s) and resets to sync with Notehub.
@@ -153,6 +164,10 @@ const RETROFIT_FLOAT_ECHO_COMMANDS: EchoCommand[] = [
     {
       label: `Pump ${pump} low thr`,
       command: retrofitFloatCommands.echoPumpLowThreshold(pump),
+    },
+    {
+      label: `Pump ${pump} enabled`,
+      command: retrofitFloatCommands.echoPumpEnabled(pump),
     },
   ]),
 ];
@@ -233,6 +248,10 @@ const RETROFIT_FLOAT_CONFIG_COMMANDS: ConfigCommandTemplate[] = [
     {
       label: `Pump ${pump} low (%)`,
       command: retrofitFloatCommands.setPumpLowThreshold(pump, 30),
+    },
+    {
+      label: `Pump ${pump} enable`,
+      command: retrofitFloatCommands.setPumpEnabled(pump, true),
     },
   ]),
 ];

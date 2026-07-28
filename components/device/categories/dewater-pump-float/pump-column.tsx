@@ -3,84 +3,192 @@
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
 import Typography from "@mui/material/Typography";
 
-import { PumpMonitoringPalette } from "./constants";
+import {
+  PUMP_DISABLED_OPACITY,
+  PUMP_TOGGLE_HEIGHT,
+  PumpMonitoringPalette,
+  STATUS_INDICATOR_HEIGHT,
+} from "./constants";
 import { PumpLevelGauge } from "./pump-level-gauge";
 import type { PumpStatus } from "./types";
 
 interface PumpColumnProps {
   pump: PumpStatus;
   isOn: boolean;
-  /** Preformatted total runtime, e.g. "1h 05m" or "12s". */
-  runtimeLabel: string;
+  /**
+   * Preformatted lifetime runtime since installation, e.g. "2d 4h 23m".
+   * Not resettable.
+   */
+  totalRuntimeLabel: string;
+  /** Preformatted runtime since the last reset, same format. */
+  currentRuntimeLabel: string;
   onResetRuntime: (pumpId: number) => void;
+  onEnabledChange: (pumpId: number, enabled: boolean) => void;
   onTriggerLevelHighChange: (pumpId: number, level: number) => void;
   onTriggerLevelLowChange: (pumpId: number, level: number) => void;
 }
 
+/**
+ * Single pill carrying the pump's binary state — dot color plus its label.
+ * A disabled pump is always off, and shows a neutral dot rather than the
+ * red "off, but still in the control loop" one.
+ */
 function StatusIndicator({
-  label,
-  active,
-  activeColor,
+  isOn,
+  disabled,
 }: {
-  label: string;
-  active: boolean;
-  activeColor: string;
+  isOn: boolean;
+  disabled: boolean;
 }) {
+  const color = disabled
+    ? PumpMonitoringPalette.indicatorOff
+    : isOn
+      ? PumpMonitoringPalette.greenActive
+      : PumpMonitoringPalette.redActive;
+  const glow = disabled
+    ? "transparent"
+    : isOn
+      ? PumpMonitoringPalette.greenActiveGlow
+      : PumpMonitoringPalette.redActiveGlow;
+
   return (
     <Stack
       direction="row"
+      spacing={1}
+      role="status"
       sx={{
         alignItems: "center",
-        justifyContent: "space-between",
+        justifyContent: "center",
+        width: "100%",
+        height: STATUS_INDICATOR_HEIGHT,
         bgcolor: PumpMonitoringPalette.columnBg,
         border: `1px solid ${PumpMonitoringPalette.borderMuted}`,
         borderRadius: "12px",
         px: 1.5,
-        py: 1.25,
       }}
     >
-      <Typography sx={{ color: PumpMonitoringPalette.text, fontSize: 12, fontWeight: 500 }}>
-        {label}
-      </Typography>
       <Box
         sx={{
-          width: 18,
-          height: 18,
-          borderRadius: "9px",
-          bgcolor: active ? activeColor : PumpMonitoringPalette.indicatorOff,
+          width: 12,
+          height: 12,
+          borderRadius: "6px",
+          bgcolor: color,
+          boxShadow: `0 0 0 3px ${glow}`,
         }}
       />
+      <Typography
+        sx={{
+          color: disabled
+            ? PumpMonitoringPalette.textMuted
+            : PumpMonitoringPalette.text,
+          fontSize: 13,
+          fontWeight: 600,
+        }}
+      >
+        {isOn ? "ON" : "OFF"}
+      </Typography>
     </Stack>
+  );
+}
+
+/** One labelled runtime figure inside the runtime card. */
+function RuntimeRow({ label, value }: { label: string; value: string }) {
+  return (
+    <Box sx={{ width: "100%", textAlign: "center" }}>
+      <Typography
+        sx={{
+          color: PumpMonitoringPalette.textMuted,
+          fontSize: 11,
+          lineHeight: 1.4,
+        }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          color: PumpMonitoringPalette.text,
+          fontSize: 15,
+          fontWeight: 700,
+          letterSpacing: 0.3,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {value}
+      </Typography>
+    </Box>
   );
 }
 
 export function PumpColumn({
   pump,
   isOn,
-  runtimeLabel,
+  totalRuntimeLabel,
+  currentRuntimeLabel,
   onResetRuntime,
+  onEnabledChange,
   onTriggerLevelHighChange,
   onTriggerLevelLowChange,
 }: PumpColumnProps) {
+  const disabled = !pump.enabled;
+
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 100 }}>
-      <Typography sx={{ color: PumpMonitoringPalette.text, fontSize: 16, fontWeight: 600, mb: 1.5 }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        minWidth: 100,
+      }}
+    >
+      {/* The one control that stays live while the rest of the column is
+          switched out — kept at full contrast so it reads as the way back. */}
+      <Box
+        sx={{
+          height: PUMP_TOGGLE_HEIGHT,
+          mb: 1.5,
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        <Switch
+          size="small"
+          checked={pump.enabled}
+          onChange={(event) => onEnabledChange(pump.id, event.target.checked)}
+          slotProps={{ input: { "aria-label": `Enable pump ${pump.id}` } }}
+        />
+      </Box>
+
+      <Typography
+        sx={{
+          color: disabled
+            ? PumpMonitoringPalette.textMuted
+            : PumpMonitoringPalette.text,
+          fontSize: 16,
+          fontWeight: 600,
+          mb: 1.5,
+        }}
+      >
         Pump {pump.id}
       </Typography>
+
+      <Box sx={{ width: "100%", mb: 1.5 }}>
+        <StatusIndicator isOn={isOn} disabled={disabled} />
+      </Box>
 
       <PumpLevelGauge
         triggerLevelHigh={pump.triggerLevelHigh}
         triggerLevelLow={pump.triggerLevelLow}
-        onTriggerLevelHighChange={(level) => onTriggerLevelHighChange(pump.id, level)}
-        onTriggerLevelLowChange={(level) => onTriggerLevelLowChange(pump.id, level)}
+        onTriggerLevelHighChange={(level) =>
+          onTriggerLevelHighChange(pump.id, level)
+        }
+        onTriggerLevelLowChange={(level) =>
+          onTriggerLevelLowChange(pump.id, level)
+        }
+        disabled={disabled}
       />
-
-      <Stack spacing={1} sx={{ mt: 2, width: "100%" }}>
-        <StatusIndicator label="ON" active={isOn} activeColor={PumpMonitoringPalette.greenActive} />
-        <StatusIndicator label="OFF" active={!isOn} activeColor={PumpMonitoringPalette.redActive} />
-      </Stack>
 
       <Stack
         spacing={1}
@@ -92,16 +200,23 @@ export function PumpColumn({
           border: `1px solid ${PumpMonitoringPalette.borderMuted}`,
           borderRadius: "14px",
           p: 1.5,
+          ...(disabled ? { opacity: PUMP_DISABLED_OPACITY } : {}),
         }}
       >
-        <Typography sx={{ color: PumpMonitoringPalette.textMuted, fontSize: 12 }}>Runtime</Typography>
-        <Typography sx={{ color: PumpMonitoringPalette.text, fontSize: 20, fontWeight: 700, letterSpacing: 0.5 }}>
-          {runtimeLabel}
-        </Typography>
+        <RuntimeRow label="Total runtime" value={totalRuntimeLabel} />
+        <Box
+          sx={{
+            width: "100%",
+            height: "1px",
+            bgcolor: PumpMonitoringPalette.borderMuted,
+          }}
+        />
+        <RuntimeRow label="Current runtime" value={currentRuntimeLabel} />
         <Button
           size="small"
+          disabled={disabled}
           onClick={() => onResetRuntime(pump.id)}
-          aria-label={`Reset runtime for pump ${pump.id}`}
+          aria-label={`Reset current runtime for pump ${pump.id}`}
           sx={{
             mt: 0.5,
             px: 2.5,

@@ -13,7 +13,9 @@ import { ThresholdTrack } from "./threshold-track";
 import {
   LED_COLUMN_HEIGHT,
   LED_COLUMN_WIDTH,
+  PUMP_TOGGLE_HEIGHT,
   PumpMonitoringPalette,
+  STATUS_INDICATOR_HEIGHT,
   WATER_LED_SEGMENT_COUNT,
 } from "./constants";
 
@@ -48,9 +50,28 @@ export function WaterLevelColumn({
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 88 }}>
-      <Typography sx={{ color: PumpMonitoringPalette.text, fontSize: 16, fontWeight: 600, mb: 2 }}>
+      {/* These two stand in for the pump columns' enable switch and status
+          pill, keeping every title and gauge on the same line. Only needed
+          while the columns sit in one row. */}
+      <Box
+        sx={{
+          display: { xs: "none", md: "block" },
+          height: PUMP_TOGGLE_HEIGHT,
+          mb: 1.5,
+        }}
+      />
+
+      <Typography sx={{ color: PumpMonitoringPalette.text, fontSize: 16, fontWeight: 600, mb: 1.5 }}>
         Water Level
       </Typography>
+
+      <Box
+        sx={{
+          display: { xs: "none", md: "block" },
+          height: STATUS_INDICATOR_HEIGHT,
+          mb: 1.5,
+        }}
+      />
 
       <Box sx={{ width: LED_COLUMN_WIDTH, height: LED_COLUMN_HEIGHT, position: "relative" }}>
         <LedColumnShell>

@@ -11,7 +11,8 @@ import { COLUMN_GAP, DASHBOARD_MIN_WIDTH, PumpMonitoringPalette } from "./consta
 import { createDemoPumpMonitoringData } from "./demo-data";
 import { isPumpOn } from "./pump-led-threshold-logic";
 import { PumpColumn } from "./pump-column";
-import type { PumpMonitoringData } from "./types";
+import { ResetRuntimeDialog } from "./reset-runtime-dialog";
+import type { PumpMonitoringData, PumpStatus } from "./types";
 import { WaterLevelColumn } from "./water-level-column";
 
 interface PumpMonitoringDashboardProps {
@@ -35,7 +36,7 @@ function readCurrentWaterLevel(readings: DeviceReading[]): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-// Total runtime = completed intervals + the current one if the pump is still
+// Session runtime = completed intervals + the current one if the pump is still
 // on. `nowMs` drives the live count-up between firmware pushes.
 function pumpRuntimeSeconds(
   runtime: PumpRuntime | undefined,
@@ -49,16 +50,47 @@ function pumpRuntimeSeconds(
   return runtime.accumulatedSeconds + liveSeconds;
 }
 
-// Compact elapsed-time label, e.g. "45s", "5m 09s", "1h 05m".
+// A device counter counts up live between reports, but only for the ON time the
+// last report didn't already cover — hence the later of "pump turned on" and
+// "counter was reported" as the start of the uncounted stretch.
+function deviceCounterSeconds(
+  runtime: PumpRuntime | undefined,
+  reported: number | undefined,
+  nowMs: number,
+): number | null {
+  if (!runtime || reported === undefined) return null;
+  if (!runtime.isOn || runtime.onSinceEpoch === null) return reported;
+  const countedThrough = Math.max(
+    runtime.onSinceEpoch,
+    runtime.countersReportedAtEpoch ?? runtime.onSinceEpoch,
+  );
+  return reported + Math.max(0, nowMs / 1000 - countedThrough);
+}
+
+// A disabled pump is off, but the firmware's OFF transition may not have
+// landed yet — hold the counters instead of letting them run past the "OFF"
+// the column already shows.
+function holdRuntime(
+  runtime: PumpRuntime | undefined,
+  enabled: boolean,
+): PumpRuntime | undefined {
+  if (enabled || !runtime?.isOn) return runtime;
+  return { ...runtime, isOn: false };
+}
+
+/** Shown for a device counter the firmware hasn't reported yet. */
+const UNAVAILABLE_LABEL = "—";
+
+// Minute-resolution elapsed-time label, e.g. "23m", "4h 23m", "2d 4h 23m".
+// Sub-minute runtime reads as "0m" — seconds are deliberately not shown.
 function formatRuntime(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
-  const hours = Math.floor(s / 3600);
+  const days = Math.floor(s / 86400);
+  const hours = Math.floor((s % 86400) / 3600);
   const minutes = Math.floor((s % 3600) / 60);
-  const seconds = s % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  if (hours > 0) return `${hours}h ${pad(minutes)}m`;
-  if (minutes > 0) return `${minutes}m ${pad(seconds)}s`;
-  return `${seconds}s`;
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
 }
 
 export function PumpMonitoringDashboard({
@@ -81,7 +113,8 @@ export function PumpMonitoringDashboard({
   // counts up between the firmware's periodic pushes. Idle when nothing is on.
   const [nowMs, setNowMs] = useState(() => Date.now());
   const anyPumpOn =
-    isConnected && Object.values(pumpRuntimes).some((r) => r.isOn);
+    isConnected &&
+    data.pumps.some((p) => p.enabled && pumpRuntimes[p.id]?.isOn);
   useEffect(() => {
     if (!anyPumpOn) return;
     const timer = setInterval(() => setNowMs(Date.now()), 1000);
@@ -104,30 +137,53 @@ export function PumpMonitoringDashboard({
     }));
   }, []);
 
+  // Reset is destructive and has no undo, so the button only opens the
+  // confirmation — `pendingResetPumpId` is the pump awaiting confirmation.
+  const [pendingResetPumpId, setPendingResetPumpId] = useState<number | null>(
+    null,
+  );
+  const requestResetRuntime = useCallback(
+    (pumpId: number) => setPendingResetPumpId(pumpId),
+    [],
+  );
+  const cancelResetRuntime = useCallback(() => setPendingResetPumpId(null), []);
+
   // Connected: reset the live accumulator tracked by the provider.
   // Disconnected: reset the local demo value instead.
-  const handleResetRuntime = useCallback(
-    (pumpId: number) => {
-      if (isConnected) {
-        resetPumpRuntime(pumpId);
-      } else {
-        resetRuntime(pumpId);
-      }
-    },
-    [isConnected, resetPumpRuntime, resetRuntime],
-  );
+  const confirmResetRuntime = useCallback(() => {
+    if (pendingResetPumpId === null) return;
+    if (isConnected) {
+      resetPumpRuntime(pendingResetPumpId);
+    } else {
+      resetRuntime(pendingResetPumpId);
+    }
+    setPendingResetPumpId(null);
+  }, [isConnected, pendingResetPumpId, resetPumpRuntime, resetRuntime]);
 
-  const sendThresholdCommand = useCallback(
+  const sendPumpCommand = useCallback(
     (command: Record<string, string>) => {
       if (isConnected) {
         void sendCommand(command);
       } else {
         console.debug(
-          `[BLE] Not connected — threshold command not sent: ${JSON.stringify(command)}`,
+          `[BLE] Not connected — pump command not sent: ${JSON.stringify(command)}`,
         );
       }
     },
     [isConnected, sendCommand],
+  );
+
+  // The firmware owns the consequence: it stops the pump on disable and keeps
+  // it out of the control loop until re-enabled, so nothing else is sent here.
+  const setPumpEnabled = useCallback(
+    (pumpId: number, enabled: boolean) => {
+      setData((prev) => ({
+        ...prev,
+        pumps: prev.pumps.map((p) => (p.id === pumpId ? { ...p, enabled } : p)),
+      }));
+      sendPumpCommand(retrofitFloatCommands.setPumpEnabled(pumpId, enabled));
+    },
+    [sendPumpCommand],
   );
 
   const setTriggerLevelHigh = useCallback(
@@ -138,11 +194,11 @@ export function PumpMonitoringDashboard({
           p.id === pumpId ? { ...p, triggerLevelHigh: level } : p,
         ),
       }));
-      sendThresholdCommand(
+      sendPumpCommand(
         retrofitFloatCommands.setPumpHighThreshold(pumpId, level),
       );
     },
-    [sendThresholdCommand],
+    [sendPumpCommand],
   );
 
   const setTriggerLevelLow = useCallback(
@@ -153,11 +209,11 @@ export function PumpMonitoringDashboard({
           p.id === pumpId ? { ...p, triggerLevelLow: level } : p,
         ),
       }));
-      sendThresholdCommand(
+      sendPumpCommand(
         retrofitFloatCommands.setPumpLowThreshold(pumpId, level),
       );
     },
-    [sendThresholdCommand],
+    [sendPumpCommand],
   );
 
   // Live device data takes over once connected, falling back to the demo
@@ -165,6 +221,38 @@ export function PumpMonitoringDashboard({
   // arrives). Disconnected always reads as 0 rather than showing stale/demo data.
   const liveWaterLevel = isConnected ? readCurrentWaterLevel(readings) : null;
   const waterLevel = isConnected ? liveWaterLevel ?? data.waterLevel : 0;
+
+  // Device counters win once the firmware reports them; until then "current"
+  // falls back to the locally derived session runtime, and "total" has no local
+  // equivalent to stand in for. Disconnected shows the demo values.
+  const runtimeLabelsFor = (pump: PumpStatus) => {
+    const runtime = holdRuntime(pumpRuntimes[pump.id], pump.enabled);
+    const totalSeconds = deviceCounterSeconds(
+      runtime,
+      runtime?.totalSeconds,
+      nowMs,
+    );
+    const currentSeconds = deviceCounterSeconds(
+      runtime,
+      runtime?.currentSeconds,
+      nowMs,
+    );
+    return {
+      total: isConnected
+        ? totalSeconds === null
+          ? UNAVAILABLE_LABEL
+          : formatRuntime(totalSeconds)
+        : `${pump.totalRuntimeHours}h`,
+      current: isConnected
+        ? formatRuntime(currentSeconds ?? pumpRuntimeSeconds(runtime, nowMs))
+        : `${pump.runtimeHours}h`,
+    };
+  };
+
+  const pendingResetPump =
+    pendingResetPumpId === null
+      ? undefined
+      : data.pumps.find((p) => p.id === pendingResetPumpId);
 
   return (
     <Box>
@@ -214,21 +302,25 @@ export function PumpMonitoringDashboard({
                 // now owns the hysteresis decision. Reads as OFF (0s runtime)
                 // until the first pump_N_state push this session (firmware only
                 // pushes on a transition — see README "Pump ON/OFF control").
+                // A disabled pump reads OFF regardless: the disable command
+                // stops it, so don't show ON while that round trip completes.
                 const runtime = pumpRuntimes[pump.id];
-                const isOn = isConnected
-                  ? runtime?.isOn ?? false
-                  : isPumpOn(waterLevel, pump.triggerLevelHigh);
-                const runtimeLabel = isConnected
-                  ? formatRuntime(pumpRuntimeSeconds(runtime, nowMs))
-                  : `${pump.runtimeHours}h`;
+                const isOn =
+                  pump.enabled &&
+                  (isConnected
+                    ? runtime?.isOn ?? false
+                    : isPumpOn(waterLevel, pump.triggerLevelHigh));
+                const runtimeLabels = runtimeLabelsFor(pump);
 
                 return (
                   <PumpColumn
                     key={pump.id}
                     pump={pump}
                     isOn={isOn}
-                    runtimeLabel={runtimeLabel}
-                    onResetRuntime={handleResetRuntime}
+                    totalRuntimeLabel={runtimeLabels.total}
+                    currentRuntimeLabel={runtimeLabels.current}
+                    onResetRuntime={requestResetRuntime}
+                    onEnabledChange={setPumpEnabled}
                     onTriggerLevelHighChange={setTriggerLevelHigh}
                     onTriggerLevelLowChange={setTriggerLevelLow}
                   />
@@ -238,6 +330,16 @@ export function PumpMonitoringDashboard({
           </Box>
         </Box>
       </Box>
+
+      <ResetRuntimeDialog
+        open={pendingResetPump !== undefined}
+        pumpId={pendingResetPump?.id ?? null}
+        currentRuntimeLabel={
+          pendingResetPump ? runtimeLabelsFor(pendingResetPump).current : ""
+        }
+        onConfirm={confirmResetRuntime}
+        onCancel={cancelResetRuntime}
+      />
     </Box>
   );
 }

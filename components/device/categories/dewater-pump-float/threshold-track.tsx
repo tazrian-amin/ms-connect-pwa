@@ -33,6 +33,8 @@ interface ThresholdTrackProps {
   triggerLevelLow: number;
   onTriggerLevelHighChange: (value: number) => void;
   onTriggerLevelLowChange: (value: number) => void;
+  /** Pointers still mark the band, but can't be dragged. */
+  disabled?: boolean;
 }
 
 interface DragState {
@@ -65,6 +67,7 @@ function ThresholdPointer({
   value,
   valueMin,
   valueMax,
+  disabled,
 }: {
   name: string;
   label: ThresholdPointerLabel;
@@ -72,6 +75,7 @@ function ThresholdPointer({
   value: number;
   valueMin: number;
   valueMax: number;
+  disabled: boolean;
 }) {
   return (
     <Box
@@ -80,6 +84,7 @@ function ThresholdPointer({
       aria-valuemin={valueMin}
       aria-valuemax={valueMax}
       aria-valuenow={value}
+      aria-disabled={disabled || undefined}
       sx={{ pointerEvents: "none" }}
     >
       <Box
@@ -138,6 +143,7 @@ export function ThresholdTrack({
   triggerLevelLow,
   onTriggerLevelHighChange,
   onTriggerLevelLowChange,
+  disabled = false,
 }: ThresholdTrackProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
 
@@ -158,6 +164,7 @@ export function ThresholdTrack({
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (disabled) return;
     const level = levelFromPointer(event);
     const label = pointerUnderPress(level, triggerLevelHigh, triggerLevelLow);
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -204,8 +211,9 @@ export function ThresholdTrack({
         width: LED_COLUMN_WIDTH,
         height: LED_COLUMN_HEIGHT,
         zIndex: 2,
-        cursor: "ns-resize",
+        cursor: disabled ? "default" : "ns-resize",
         touchAction: "none",
+        ...(disabled ? { pointerEvents: "none" } : {}),
       }}
     >
       {/* LOW first so HIGH stacks above it where the two overlap. */}
@@ -216,6 +224,7 @@ export function ThresholdTrack({
         value={lowLevel}
         valueMin={0}
         valueMax={highLevel}
+        disabled={disabled}
       />
       <ThresholdPointer
         name={name}
@@ -224,6 +233,7 @@ export function ThresholdTrack({
         value={highLevel}
         valueMin={lowLevel}
         valueMax={100}
+        disabled={disabled}
       />
     </Box>
   );

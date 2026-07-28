@@ -14,6 +14,7 @@ import { ThresholdTrack } from "./threshold-track";
 import {
   LED_COLUMN_HEIGHT,
   LED_COLUMN_WIDTH,
+  PUMP_DISABLED_OPACITY,
   PumpMonitoringPalette,
   WATER_LED_SEGMENT_COUNT,
 } from "./constants";
@@ -25,6 +26,8 @@ interface PumpLevelGaugeProps {
   triggerLevelHigh: number;
   onTriggerLevelHighChange: (level: number) => void;
   onTriggerLevelLowChange: (level: number) => void;
+  /** Drops the band colors and locks the sliders — the pump is switched off. */
+  disabled?: boolean;
 }
 
 const SEGMENT_COLORS = {
@@ -49,6 +52,7 @@ export function PumpLevelGauge({
   triggerLevelHigh,
   onTriggerLevelHighChange,
   onTriggerLevelLowChange,
+  disabled = false,
 }: PumpLevelGaugeProps) {
   const segments = useMemo(
     () => Array.from({ length: WATER_LED_SEGMENT_COUNT }, (_, i) => i),
@@ -56,13 +60,25 @@ export function PumpLevelGauge({
   );
 
   return (
-    <Box sx={{ width: LED_COLUMN_WIDTH, display: "flex", flexDirection: "column", alignItems: "center" }}>
+    <Box
+      sx={{
+        width: LED_COLUMN_WIDTH,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        ...(disabled ? { opacity: PUMP_DISABLED_OPACITY } : {}),
+      }}
+    >
       <Box sx={{ width: LED_COLUMN_WIDTH, height: LED_COLUMN_HEIGHT, position: "relative" }}>
         <LedColumnShell>
           {segments.map((index) => {
-            const { color, glow } = SEGMENT_COLORS[
-              getPumpLedSegmentState(index, triggerLevelLow, triggerLevelHigh)
-            ];
+            // A disabled pump keeps its band boundaries visible through the
+            // slider pointers only — every segment reads as unlit.
+            const { color, glow } = disabled
+              ? SEGMENT_COLORS.off
+              : SEGMENT_COLORS[
+                  getPumpLedSegmentState(index, triggerLevelLow, triggerLevelHigh)
+                ];
 
             return (
               <Box
@@ -83,6 +99,7 @@ export function PumpLevelGauge({
           triggerLevelLow={triggerLevelLow}
           onTriggerLevelHighChange={onTriggerLevelHighChange}
           onTriggerLevelLowChange={onTriggerLevelLowChange}
+          disabled={disabled}
         />
       </Box>
 

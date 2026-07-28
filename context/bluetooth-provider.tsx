@@ -184,18 +184,29 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
 
   const clearCommandLog = useCallback(() => setCommandLog([]), []);
 
-  // Zeroes a pump's accumulated runtime; if it's currently ON, restarts the
-  // running interval from now so the live counter continues from 0.
+  // Zeroes a pump's *current* runtime; if it's currently ON, restarts the
+  // running interval from now so the live counter continues from 0. The
+  // lifetime total is deliberately left untouched — it is never resettable.
+  //
+  // Local-only for now: the firmware has no reset command key yet, so the
+  // zeroed currentSeconds is optimistic and the device's next
+  // pump_N_current_runtime report will overwrite it.
   const resetPumpRuntime = useCallback((pumpId: number) => {
     setPumpRuntimes((prev) => {
       const current = prev[pumpId];
       if (!current) return prev;
+      const nowSeconds = Date.now() / 1000;
       return {
         ...prev,
         [pumpId]: {
-          isOn: current.isOn,
+          ...current,
           accumulatedSeconds: 0,
-          onSinceEpoch: current.isOn ? Date.now() / 1000 : null,
+          onSinceEpoch: current.isOn ? nowSeconds : null,
+          currentSeconds: current.currentSeconds === undefined ? undefined : 0,
+          countersReportedAtEpoch:
+            current.countersReportedAtEpoch === undefined
+              ? undefined
+              : nowSeconds,
         },
       };
     });
@@ -254,6 +265,38 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        // Device-owned runtime counters, in seconds. UPCOMING FIRMWARE FEATURE:
+        // these key names are provisional — if the firmware ships different ones,
+        // this block is the only place that needs updating.
+        //   pump_N_total_runtime   lifetime since installation, never reset
+        //   pump_N_current_runtime since the user's last reset
+        for (const [key, val] of Object.entries(json)) {
+          const counterMatch = key.match(
+            /^pump_(\d+)_(total|current)_runtime$/,
+          );
+          if (!counterMatch) continue;
+          const seconds = Number(val);
+          if (!Number.isFinite(seconds) || seconds < 0) continue;
+          const pumpId = Number(counterMatch[1]);
+          const field =
+            counterMatch[2] === "total" ? "totalSeconds" : "currentSeconds";
+          setPumpRuntimes((prev) => {
+            const current = prev[pumpId] ?? {
+              isOn: false,
+              accumulatedSeconds: 0,
+              onSinceEpoch: null,
+            };
+            return {
+              ...prev,
+              [pumpId]: {
+                ...current,
+                [field]: seconds,
+                countersReportedAtEpoch: eventSeconds,
+              },
+            };
+          });
+        }
+
         // pump_N_state is edge-triggered: each push is an actual ON/OFF flip, so
         // we close out the previous ON interval into accumulatedSeconds using the
         // device timestamps and start/stop the running interval accordingly.
@@ -282,6 +325,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
             return {
               ...prev,
               [pumpId]: {
+                ...current,
                 isOn: false,
                 accumulatedSeconds: current.accumulatedSeconds + runtimeToAdd,
                 onSinceEpoch: null,
