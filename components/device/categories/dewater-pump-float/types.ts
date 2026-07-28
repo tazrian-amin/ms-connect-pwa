@@ -21,3 +21,10 @@ export type PumpMonitoringData = {
 };
 
 export type PumpTriggerBand = "high" | "low";
+
+/**
+ * Alteration mode's assignment matrix, keyed by the pump column that claims a
+ * row. Rows are unique across the matrix, so a row id appears at most once —
+ * a column with no claim is simply absent.
+ */
+export type PumpRowAssignments = Record<number, number>;

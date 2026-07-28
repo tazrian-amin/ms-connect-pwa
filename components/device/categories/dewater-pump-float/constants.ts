@@ -25,6 +25,13 @@ export const PumpMonitoringPalette = {
   thresholdPointer: "#64748b",
   thresholdPointerBorder: "#475569",
   thresholdPointerGrip: "#f1f5f9",
+  /**
+   * Alteration matrix radios. Idle follows the theme so the unclaimed circles
+   * stay visible in both modes; claimed is fixed, since it will later be
+   * driven by the firmware and carries the same meaning as the water LEDs.
+   */
+  radioIdle: "var(--panel-text-muted)",
+  radioClaimed: "#3b82f6",
 } as const;
 
 export const PUMP_COUNT = 6;
@@ -88,6 +95,13 @@ export const STATUS_INDICATOR_HEIGHT = 42;
 
 /** Height of the enable/disable switch row above each pump title, same reason. */
 export const PUMP_TOGGLE_HEIGHT = 30;
+
+/**
+ * Alteration mode swaps each pump column's title for a stack of PUMP_COUNT
+ * radios — one per row of the assignment matrix. Fixed so the water column's
+ * row labels line up with the radios across from them.
+ */
+export const PUMP_MATRIX_ROW_HEIGHT = 34;
 
 /** Dimming applied to a disabled pump column's readouts and gauge. */
 export const PUMP_DISABLED_OPACITY = 0.5;

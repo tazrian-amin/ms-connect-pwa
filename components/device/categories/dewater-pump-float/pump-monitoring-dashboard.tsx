@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import LockOpenOutlinedIcon from "@mui/icons-material/LockOpenOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
@@ -23,7 +23,11 @@ import { MinOffTimeSection } from "./min-off-time-section";
 import { isPumpOn } from "./pump-led-threshold-logic";
 import { PumpColumn } from "./pump-column";
 import { ResetRuntimeDialog } from "./reset-runtime-dialog";
-import type { PumpMonitoringData, PumpStatus } from "./types";
+import type {
+  PumpMonitoringData,
+  PumpRowAssignments,
+  PumpStatus,
+} from "./types";
 import { WaterLevelColumn } from "./water-level-column";
 
 interface PumpMonitoringDashboardProps {
@@ -164,17 +168,35 @@ export function PumpMonitoringDashboard({
   // be changed by accident.
   const [editsEnabled, setEditsEnabled] = useState(false);
 
-  // Alteration is a further opt-in layered on top of edits, so it can only be
-  // armed while edits are unlocked.
+  // Alteration picks the layout rather than granting any write of its own, so
+  // it outlives a re-lock: the matrix stays up and simply reads as read-only,
+  // the same as every other control on the dashboard. Changing it either way
+  // goes through the edit lock, so leaving the layout means unlocking first.
   const [alterationEnabled, setAlterationEnabled] = useState(false);
 
-  // Re-locking edits drops alteration with it — otherwise it would sit armed
-  // and invisible behind a disabled toggle, ready the next time edits open.
-  const toggleEdits = useCallback(() => {
-    const next = !editsEnabled;
-    setEditsEnabled(next);
-    if (!next) setAlterationEnabled(false);
-  }, [editsEnabled]);
+  const toggleEdits = useCallback(
+    () => setEditsEnabled((prev) => !prev),
+    [],
+  );
+
+  // Alteration mode's assignment matrix: the row each pump column claims.
+  // Rows are unique across the matrix, so claiming one takes it from whichever
+  // column held it rather than duplicating it. Held in the UI only — nothing
+  // is sent to the device and nothing hydrates it, since the firmware will
+  // eventually be the one reporting which row is lit. Kept across an
+  // alteration toggle so the matrix comes back the way it was left.
+  const [rowAssignments, setRowAssignments] = useState<PumpRowAssignments>({});
+
+  const assignRow = useCallback((pumpId: number, rowId: number) => {
+    setRowAssignments((prev) => {
+      const next: PumpRowAssignments = {};
+      for (const [id, row] of Object.entries(prev)) {
+        if (row !== rowId) next[Number(id)] = row;
+      }
+      next[pumpId] = rowId;
+      return next;
+    });
+  }, []);
 
   const [data, setData] = useState<PumpMonitoringData>(
     () => dataProp ?? createDemoPumpMonitoringData(),
@@ -358,6 +380,13 @@ export function PumpMonitoringDashboard({
       ? undefined
       : data.pumps.find((p) => p.id === pendingResetPumpId);
 
+  // The matrix is square: one row per pump, one column per pump. The water
+  // column labels these rows and each pump column offers the same list.
+  const matrixRowIds = useMemo(
+    () => data.pumps.map((p) => p.id),
+    [data.pumps],
+  );
+
   return (
     <Box>
       <Box
@@ -402,8 +431,6 @@ export function PumpMonitoringDashboard({
             onChange={toggleEdits}
             sx={headerToggleSx}
           >
-            {/* Both the icon and the label name what the press will do, not the
-                state it's in — the green tint already carries the state. */}
             {editsEnabled ? (
               <LockOutlinedIcon sx={{ fontSize: 17 }} />
             ) : (
@@ -429,15 +456,30 @@ export function PumpMonitoringDashboard({
           boxShadow: "0 2px 8px rgba(15, 23, 42, 0.06)",
         }}
       >
-        <Box sx={{ overflowX: { xs: "visible", md: "auto" } }}>
+        {/* The matrix only reads as a matrix while its rows line up across
+            every column, so alteration mode keeps the single-row layout at
+            every width and scrolls sideways instead of stacking. */}
+        <Box
+          sx={{
+            overflowX: alterationEnabled
+              ? "auto"
+              : { xs: "visible", md: "auto" },
+          }}
+        >
           <Box
             sx={{
               display: "flex",
-              flexDirection: { xs: "column", md: "row" },
-              alignItems: { xs: "center", md: "flex-start" },
+              flexDirection: alterationEnabled
+                ? "row"
+                : { xs: "column", md: "row" },
+              alignItems: alterationEnabled
+                ? "flex-start"
+                : { xs: "center", md: "flex-start" },
               gap: `${COLUMN_GAP}px`,
               pb: 0.5,
-              minWidth: { xs: 0, md: DASHBOARD_MIN_WIDTH },
+              minWidth: alterationEnabled
+                ? DASHBOARD_MIN_WIDTH
+                : { xs: 0, md: DASHBOARD_MIN_WIDTH },
             }}
           >
             <WaterLevelColumn
@@ -447,24 +489,21 @@ export function PumpMonitoringDashboard({
               onTriggerLevelHighChange={onWaterTriggerLevelHighChange}
               onTriggerLevelLowChange={onWaterTriggerLevelLowChange}
               locked={!editsEnabled}
+              matrixRowIds={alterationEnabled ? matrixRowIds : undefined}
             />
             <Box
               sx={{
                 display: "flex",
                 flexDirection: "row",
-                flexWrap: { xs: "wrap", md: "nowrap" },
+                flexWrap: alterationEnabled
+                  ? "nowrap"
+                  : { xs: "wrap", md: "nowrap" },
                 justifyContent: "center",
-                width: { xs: "100%", md: "auto" },
+                width: alterationEnabled ? "auto" : { xs: "100%", md: "auto" },
                 gap: `${COLUMN_GAP}px`,
               }}
             >
               {data.pumps.map((pump) => {
-                // Live device state takes over once connected — the firmware
-                // now owns the hysteresis decision. Reads as OFF (0s runtime)
-                // until the first pump_N_state push this session (firmware only
-                // pushes on a transition — see README "Pump ON/OFF control").
-                // A disabled pump reads OFF regardless: the disable command
-                // stops it, so don't show ON while that round trip completes.
                 const runtime = pumpRuntimes[pump.id];
                 const isOn =
                   pump.enabled &&
@@ -485,6 +524,15 @@ export function PumpMonitoringDashboard({
                     onTriggerLevelHighChange={setTriggerLevelHigh}
                     onTriggerLevelLowChange={setTriggerLevelLow}
                     locked={!editsEnabled}
+                    matrix={
+                      alterationEnabled
+                        ? {
+                            rowIds: matrixRowIds,
+                            selectedRowId: rowAssignments[pump.id] ?? null,
+                            onSelect: assignRow,
+                          }
+                        : undefined
+                    }
                   />
                 );
               })}

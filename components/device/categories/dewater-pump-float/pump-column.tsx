@@ -12,8 +12,16 @@ import {
   PumpMonitoringPalette,
   STATUS_INDICATOR_HEIGHT,
 } from "./constants";
+import { PumpAssignmentRadios } from "./pump-assignment-radios";
 import { PumpLevelGauge } from "./pump-level-gauge";
 import type { PumpStatus } from "./types";
+
+/** This column's slice of the alteration matrix — see PumpAssignmentRadios. */
+interface PumpColumnMatrix {
+  rowIds: number[];
+  selectedRowId: number | null;
+  onSelect: (pumpId: number, rowId: number) => void;
+}
 
 interface PumpColumnProps {
   pump: PumpStatus;
@@ -34,6 +42,12 @@ interface PumpColumnProps {
    * status all keep reading as normal.
    */
   locked?: boolean;
+  /**
+   * Alteration mode: the column's title gives way to its radio stack, since
+   * the matrix's row labels already name the pumps down the left-hand side.
+   * Absent outside alteration mode, where the title comes back.
+   */
+  matrix?: PumpColumnMatrix;
 }
 
 /**
@@ -137,6 +151,7 @@ export function PumpColumn({
   onTriggerLevelHighChange,
   onTriggerLevelLowChange,
   locked = false,
+  matrix,
 }: PumpColumnProps) {
   const disabled = !pump.enabled;
 
@@ -168,18 +183,31 @@ export function PumpColumn({
         />
       </Box>
 
-      <Typography
-        sx={{
-          color: disabled
-            ? PumpMonitoringPalette.textMuted
-            : PumpMonitoringPalette.text,
-          fontSize: 16,
-          fontWeight: 600,
-          mb: 1.5,
-        }}
-      >
-        Pump {pump.id}
-      </Typography>
+      {matrix ? (
+        <Box sx={{ mb: 1.5 }}>
+          <PumpAssignmentRadios
+            pumpId={pump.id}
+            rowIds={matrix.rowIds}
+            selectedRowId={matrix.selectedRowId}
+            onSelect={matrix.onSelect}
+            disabled={disabled}
+            locked={locked}
+          />
+        </Box>
+      ) : (
+        <Typography
+          sx={{
+            color: disabled
+              ? PumpMonitoringPalette.textMuted
+              : PumpMonitoringPalette.text,
+            fontSize: 16,
+            fontWeight: 600,
+            mb: 1.5,
+          }}
+        >
+          Pump {pump.id}
+        </Typography>
+      )}
 
       <Box sx={{ mb: 1.5 }}>
         <StatusIndicator isOn={isOn} disabled={disabled} />

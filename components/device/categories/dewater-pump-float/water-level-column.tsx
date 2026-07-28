@@ -13,6 +13,7 @@ import { ThresholdTrack } from "./threshold-track";
 import {
   LED_COLUMN_HEIGHT,
   LED_COLUMN_WIDTH,
+  PUMP_MATRIX_ROW_HEIGHT,
   PUMP_TOGGLE_HEIGHT,
   PumpMonitoringPalette,
   STATUS_INDICATOR_HEIGHT,
@@ -29,6 +30,12 @@ interface WaterLevelColumnProps {
   onTriggerLevelLowChange: (level: number) => void;
   /** Pointers still mark the band, but can't be dragged. */
   locked?: boolean;
+  /**
+   * Alteration mode: the header becomes the matrix's row-label axis, and the
+   * column title drops into the status row alongside the pumps' ON/OFF pills.
+   * Absent outside alteration mode, where the header is blank spacers.
+   */
+  matrixRowIds?: number[];
 }
 
 /**
@@ -43,7 +50,9 @@ export function WaterLevelColumn({
   onTriggerLevelHighChange,
   onTriggerLevelLowChange,
   locked = false,
+  matrixRowIds,
 }: WaterLevelColumnProps) {
+  const alteration = matrixRowIds !== undefined;
   const clamped = Math.min(100, Math.max(0, waterLevel));
   const activeCount = Math.round((clamped / 100) * WATER_LED_SEGMENT_COUNT);
   const segments = useMemo(
@@ -53,28 +62,71 @@ export function WaterLevelColumn({
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 88 }}>
-      {/* These two stand in for the pump columns' enable switch and status
-          pill, keeping every title and gauge on the same line. Only needed
-          while the columns sit in one row. */}
+      {/* Stands in for the pump columns' enable switch, keeping every title,
+          radio row and gauge on the same line. Only needed while the columns
+          sit in one row — which alteration mode forces at every width. */}
       <Box
         sx={{
-          display: { xs: "none", md: "block" },
+          display: alteration ? "block" : { xs: "none", md: "block" },
           height: PUMP_TOGGLE_HEIGHT,
           mb: 1.5,
         }}
       />
 
-      <Typography sx={{ color: PumpMonitoringPalette.text, fontSize: 16, fontWeight: 600, mb: 1.5 }}>
-        Water Level
-      </Typography>
+      {/* Alteration mode names the matrix's rows here, so the title moves down
+          to the status row and this column reads as the axis it has become. */}
+      {alteration ? (
+        <Box sx={{ alignSelf: "stretch", mb: 1.5 }}>
+          {matrixRowIds.map((rowId) => (
+            <Box
+              key={rowId}
+              sx={{
+                height: PUMP_MATRIX_ROW_HEIGHT,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <Typography
+                sx={{
+                  color: PumpMonitoringPalette.text,
+                  fontSize: 15,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Pump {rowId}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      ) : (
+        <Typography sx={{ color: PumpMonitoringPalette.text, fontSize: 16, fontWeight: 600, mb: 1.5 }}>
+          Water Level
+        </Typography>
+      )}
 
       <Box
         sx={{
-          display: { xs: "none", md: "block" },
+          display: alteration ? "flex" : { xs: "none", md: "block" },
+          alignItems: "center",
+          alignSelf: "stretch",
           height: STATUS_INDICATOR_HEIGHT,
           mb: 1.5,
         }}
-      />
+      >
+        {alteration && (
+          <Typography
+            sx={{
+              color: PumpMonitoringPalette.text,
+              fontSize: 16,
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Water Level
+          </Typography>
+        )}
+      </Box>
 
       <Box sx={{ width: LED_COLUMN_WIDTH, height: LED_COLUMN_HEIGHT, position: "relative" }}>
         <LedColumnShell>
