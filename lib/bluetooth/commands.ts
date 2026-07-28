@@ -29,6 +29,8 @@ export const RETROFIT_EMA_SAMPLE_MIN = 1;
 export const RETROFIT_EMA_SAMPLE_MAX = 5000;
 export const RETROFIT_SAMPLE_PERIOD_MS_MIN = 1000;
 export const RETROFIT_SAMPLE_PERIOD_MS_MAX = 86400000;
+export const RETROFIT_PUMP_MIN_OFF_TIME_MIN = 0;
+export const RETROFIT_PUMP_MIN_OFF_TIME_MAX = 999;
 
 function clampInt(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)));
@@ -88,6 +90,16 @@ export const retrofitFloatCommands = {
   setPumpEnabled: (pump: number, enabled: boolean) => ({
     [`pump_${pump}_set_enable`]: enabled ? "1" : "0",
   }),
+  /**
+   * Minutes a pump must stay off before the control loop may start it again
+   * (0–999; 0 = no restart delay). One value covers all six pumps.
+   * UPCOMING FIRMWARE FEATURE — key name is provisional.
+   */
+  setPumpMinOffTimeMin: (minutes: number) => ({
+    set_pump_min_off_time_min: String(
+      clampInt(minutes, RETROFIT_PUMP_MIN_OFF_TIME_MIN, RETROFIT_PUMP_MIN_OFF_TIME_MAX),
+    ),
+  }),
   echoPumpHighThreshold: (pump: number) => ({
     echo: `pump_${pump}_high_thr`,
   }),
@@ -97,6 +109,7 @@ export const retrofitFloatCommands = {
   echoPumpEnabled: (pump: number) => ({
     echo: `pump_${pump}_enabled`,
   }),
+  echoPumpMinOffTime: () => ({ echo: "pump_min_off_time_min" }),
   // Flat-style identity commands — same effect as cmd-style "set_config":
   // the MCU saves the field(s) and resets to sync with Notehub.
   setProductUid: (uid: string) => ({ set_product_uid: uid }),
@@ -156,6 +169,10 @@ const RETROFIT_FLOAT_ECHO_COMMANDS: EchoCommand[] = [
   { label: "BLE state", command: { echo: "ble_state" } },
   { label: "Notehub UID", command: { echo: "uid" } },
   { label: "Sensor ADC value", command: { echo: "sensor_adc_value" } },
+  {
+    label: "Pump min off time (min)",
+    command: retrofitFloatCommands.echoPumpMinOffTime(),
+  },
   ...Array.from({ length: 6 }, (_, i) => i + 1).flatMap((pump) => [
     {
       label: `Pump ${pump} high thr`,
@@ -240,6 +257,10 @@ const RETROFIT_FLOAT_CONFIG_COMMANDS: ConfigCommandTemplate[] = [
     command: retrofitFloatCommands.setSerialNumber("SN-001"),
   },
   { label: "Reset config", command: retrofitFloatCommands.resetConfig() },
+  {
+    label: "Pump min off time (min)",
+    command: retrofitFloatCommands.setPumpMinOffTimeMin(15),
+  },
   ...Array.from({ length: 6 }, (_, i) => i + 1).flatMap((pump) => [
     {
       label: `Pump ${pump} high (%)`,

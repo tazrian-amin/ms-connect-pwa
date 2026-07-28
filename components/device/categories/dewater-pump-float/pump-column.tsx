@@ -29,6 +29,11 @@ interface PumpColumnProps {
   onEnabledChange: (pumpId: number, enabled: boolean) => void;
   onTriggerLevelHighChange: (pumpId: number, level: number) => void;
   onTriggerLevelLowChange: (pumpId: number, level: number) => void;
+  /**
+   * Read-only column: every control is inert, but the readouts, gauge and
+   * status all keep reading as normal.
+   */
+  locked?: boolean;
 }
 
 /**
@@ -131,6 +136,7 @@ export function PumpColumn({
   onEnabledChange,
   onTriggerLevelHighChange,
   onTriggerLevelLowChange,
+  locked = false,
 }: PumpColumnProps) {
   const disabled = !pump.enabled;
 
@@ -156,6 +162,7 @@ export function PumpColumn({
         <Switch
           size="small"
           checked={pump.enabled}
+          disabled={locked}
           onChange={(event) => onEnabledChange(pump.id, event.target.checked)}
           slotProps={{ input: { "aria-label": `Enable pump ${pump.id}` } }}
         />
@@ -174,7 +181,7 @@ export function PumpColumn({
         Pump {pump.id}
       </Typography>
 
-      <Box sx={{ width: "100%", mb: 1.5 }}>
+      <Box sx={{ mb: 1.5 }}>
         <StatusIndicator isOn={isOn} disabled={disabled} />
       </Box>
 
@@ -188,6 +195,7 @@ export function PumpColumn({
           onTriggerLevelLowChange(pump.id, level)
         }
         disabled={disabled}
+        locked={locked}
       />
 
       <Stack
@@ -211,10 +219,10 @@ export function PumpColumn({
             bgcolor: PumpMonitoringPalette.borderMuted,
           }}
         />
-        <RuntimeRow label="Current runtime" value={currentRuntimeLabel} />
+        <RuntimeRow label="Session runtime" value={currentRuntimeLabel} />
         <Button
           size="small"
-          disabled={disabled}
+          disabled={disabled || locked}
           onClick={() => onResetRuntime(pump.id)}
           aria-label={`Reset current runtime for pump ${pump.id}`}
           sx={{

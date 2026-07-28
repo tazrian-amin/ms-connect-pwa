@@ -1,14 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import LockOpenOutlinedIcon from "@mui/icons-material/LockOpenOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import Box from "@mui/material/Box";
+import type { SxProps, Theme } from "@mui/material/styles";
+import ToggleButton from "@mui/material/ToggleButton";
 import Typography from "@mui/material/Typography";
 
 import type { DeviceReading, PumpRuntime } from "@/types/bluetooth";
 import { useBluetooth } from "@/context/bluetooth-provider";
 import { retrofitFloatCommands } from "@/lib/bluetooth/commands";
-import { COLUMN_GAP, DASHBOARD_MIN_WIDTH, PumpMonitoringPalette } from "./constants";
+import {
+  COLUMN_GAP,
+  DASHBOARD_MIN_WIDTH,
+  PUMP_MIN_OFF_TIME_DEFAULT,
+  PumpMonitoringPalette,
+} from "./constants";
 import { createDemoPumpMonitoringData } from "./demo-data";
+import { MinOffTimeSection } from "./min-off-time-section";
 import { isPumpOn } from "./pump-led-threshold-logic";
 import { PumpColumn } from "./pump-column";
 import { ResetRuntimeDialog } from "./reset-runtime-dialog";
@@ -81,6 +92,16 @@ function holdRuntime(
 /** Shown for a device counter the firmware hasn't reported yet. */
 const UNAVAILABLE_LABEL = "—";
 
+// The ack for the min-off-time command, which is an UPCOMING FIRMWARE FEATURE
+// whose reply shape isn't pinned down yet — so take either the value echoed
+// back or a generic status line. Neither appears in the periodic water-level
+// and pump-state reports, so this can't match one of those by accident.
+function isMinOffTimeAck(json: Record<string, unknown>): boolean {
+  return (
+    json.pump_min_off_time_min !== undefined || typeof json.status === "string"
+  );
+}
+
 // Minute-resolution elapsed-time label, e.g. "23m", "4h 23m", "2d 4h 23m".
 // Sub-minute runtime reads as "0m" — seconds are deliberately not shown.
 function formatRuntime(totalSeconds: number): string {
@@ -93,6 +114,34 @@ function formatRuntime(totalSeconds: number): string {
   return `${minutes}m`;
 }
 
+// The two header toggles read as one control pair, so their chrome lives here
+// rather than being spelled out twice.
+const headerToggleSx: SxProps<Theme> = {
+  gap: 0.75,
+  px: 1.5,
+  py: 0.75,
+  flexShrink: 0,
+  borderRadius: "10px",
+  borderColor: PumpMonitoringPalette.borderMuted,
+  color: PumpMonitoringPalette.textMuted,
+  fontSize: 13,
+  fontWeight: 600,
+  textTransform: "none",
+  whiteSpace: "nowrap",
+  lineHeight: 1.2,
+  "&.Mui-selected": {
+    color: PumpMonitoringPalette.text,
+    borderColor: PumpMonitoringPalette.greenActive,
+    bgcolor: PumpMonitoringPalette.editUnlockedBg,
+    "&:hover": { bgcolor: PumpMonitoringPalette.editUnlockedBg },
+  },
+  "&.Mui-disabled": {
+    borderColor: PumpMonitoringPalette.borderMuted,
+    color: PumpMonitoringPalette.textMuted,
+    opacity: 0.45,
+  },
+};
+
 export function PumpMonitoringDashboard({
   data: dataProp,
   waterTriggerLevelHigh,
@@ -100,9 +149,32 @@ export function PumpMonitoringDashboard({
   onWaterTriggerLevelHighChange,
   onWaterTriggerLevelLowChange,
 }: PumpMonitoringDashboardProps) {
-  const { status, sendCommand, readings, pumpRuntimes, resetPumpRuntime } =
-    useBluetooth();
+  const {
+    status,
+    sendCommand,
+    sendCommandAndWait,
+    readings,
+    pumpRuntimes,
+    resetPumpRuntime,
+  } = useBluetooth();
   const isConnected = status === "connected";
+
+  // Every control on the dashboard writes straight to the device, so the
+  // dashboard opens read-only and the user has to opt in before anything can
+  // be changed by accident.
+  const [editsEnabled, setEditsEnabled] = useState(false);
+
+  // Alteration is a further opt-in layered on top of edits, so it can only be
+  // armed while edits are unlocked.
+  const [alterationEnabled, setAlterationEnabled] = useState(false);
+
+  // Re-locking edits drops alteration with it — otherwise it would sit armed
+  // and invisible behind a disabled toggle, ready the next time edits open.
+  const toggleEdits = useCallback(() => {
+    const next = !editsEnabled;
+    setEditsEnabled(next);
+    if (!next) setAlterationEnabled(false);
+  }, [editsEnabled]);
 
   const [data, setData] = useState<PumpMonitoringData>(
     () => dataProp ?? createDemoPumpMonitoringData(),
@@ -186,6 +258,38 @@ export function PumpMonitoringDashboard({
     [sendPumpCommand],
   );
 
+  // Held in the UI only — nothing hydrates it on connect, so it reads as the
+  // default again after a reconnect regardless of what the device has stored.
+  const [minOffTimeMinutes, setMinOffTimeMinutes] = useState(
+    PUMP_MIN_OFF_TIME_DEFAULT,
+  );
+
+  // Only the device's own confirmation commits the value locally, so the
+  // dashboard never shows a setting the pumps aren't actually running under.
+  // Disconnected there is nothing to confirm: the change is local anyway, so
+  // it takes effect immediately rather than sitting out the reply timeout.
+  const applyMinOffTime = useCallback(
+    async (minutes: number) => {
+      if (!isConnected) {
+        setMinOffTimeMinutes(minutes);
+        console.debug(
+          `[BLE] Not connected — min off time applied locally only: ${minutes}m`,
+        );
+        return true;
+      }
+
+      const reply = await sendCommandAndWait(
+        retrofitFloatCommands.setPumpMinOffTimeMin(minutes),
+        isMinOffTimeAck,
+      );
+      if (!reply || reply.status === "error") return false;
+
+      setMinOffTimeMinutes(minutes);
+      return true;
+    },
+    [isConnected, sendCommandAndWait],
+  );
+
   const setTriggerLevelHigh = useCallback(
     (pumpId: number, level: number) => {
       setData((prev) => ({
@@ -256,9 +360,65 @@ export function PumpMonitoringDashboard({
 
   return (
     <Box>
-      <Typography sx={{ color: PumpMonitoringPalette.textMuted, fontSize: 15, mt: 0.75, mb: 2, lineHeight: "22px" }}>
-        Monitor water level, control pump trigger levels, and track runtime.
-      </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1.5,
+          mt: 0.75,
+          mb: 2,
+        }}
+      >
+        <Typography sx={{ color: PumpMonitoringPalette.textMuted, fontSize: 15, lineHeight: "22px" }}>
+          Monitor water level, control pump trigger levels, and track runtime.
+        </Typography>
+
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 1,
+          }}
+        >
+          <ToggleButton
+            value="alteration"
+            size="small"
+            selected={alterationEnabled}
+            disabled={!editsEnabled}
+            onChange={() => setAlterationEnabled((prev) => !prev)}
+            sx={headerToggleSx}
+          >
+            <TuneOutlinedIcon sx={{ fontSize: 17 }} />
+            {alterationEnabled ? "Disable Alteration" : "Enable Alteration"}
+          </ToggleButton>
+
+          <ToggleButton
+            value="edits"
+            size="small"
+            selected={editsEnabled}
+            onChange={toggleEdits}
+            sx={headerToggleSx}
+          >
+            {/* Both the icon and the label name what the press will do, not the
+                state it's in — the green tint already carries the state. */}
+            {editsEnabled ? (
+              <LockOutlinedIcon sx={{ fontSize: 17 }} />
+            ) : (
+              <LockOpenOutlinedIcon sx={{ fontSize: 17 }} />
+            )}
+            {editsEnabled ? "Disable Edits" : "Enable Edits"}
+          </ToggleButton>
+        </Box>
+      </Box>
+
+      <MinOffTimeSection
+        minutes={minOffTimeMinutes}
+        onApply={applyMinOffTime}
+        locked={!editsEnabled}
+      />
 
       <Box
         sx={{
@@ -286,6 +446,7 @@ export function PumpMonitoringDashboard({
               triggerLevelLow={waterTriggerLevelLow}
               onTriggerLevelHighChange={onWaterTriggerLevelHighChange}
               onTriggerLevelLowChange={onWaterTriggerLevelLowChange}
+              locked={!editsEnabled}
             />
             <Box
               sx={{
@@ -323,6 +484,7 @@ export function PumpMonitoringDashboard({
                     onEnabledChange={setPumpEnabled}
                     onTriggerLevelHighChange={setTriggerLevelHigh}
                     onTriggerLevelLowChange={setTriggerLevelLow}
+                    locked={!editsEnabled}
                   />
                 );
               })}

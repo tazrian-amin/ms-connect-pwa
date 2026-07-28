@@ -20,6 +20,8 @@ export const PumpMonitoringPalette = {
   waterBadgeText: "#1d4ed8",
   resetButtonBg: "var(--panel-control-bg)",
   resetButtonText: "var(--panel-text)",
+  /** Tint behind the "Enable Edits" toggle while edits are unlocked. */
+  editUnlockedBg: "rgba(16, 185, 129, 0.14)",
   thresholdPointer: "#64748b",
   thresholdPointerBorder: "#475569",
   thresholdPointerGrip: "#f1f5f9",
@@ -67,6 +69,13 @@ export const THRESHOLD_POINTER_MIN_GAP = 2;
  */
 export const WATER_TRIGGER_LEVEL_HIGH_DEFAULT = 75;
 export const WATER_TRIGGER_LEVEL_LOW_DEFAULT = 25;
+
+/**
+ * Minutes a pump must stay off before it may restart. Held in the UI only —
+ * the firmware has no echo for it yet — so this is where it starts, and 0
+ * (no restart delay) matches the firmware's own default.
+ */
+export const PUMP_MIN_OFF_TIME_DEFAULT = 0;
 
 export const DASHBOARD_MIN_WIDTH = 920;
 export const COLUMN_GAP = 20;

@@ -27,6 +27,8 @@ interface WaterLevelColumnProps {
   triggerLevelLow: number;
   onTriggerLevelHighChange: (level: number) => void;
   onTriggerLevelLowChange: (level: number) => void;
+  /** Pointers still mark the band, but can't be dragged. */
+  locked?: boolean;
 }
 
 /**
@@ -40,6 +42,7 @@ export function WaterLevelColumn({
   triggerLevelLow,
   onTriggerLevelHighChange,
   onTriggerLevelLowChange,
+  locked = false,
 }: WaterLevelColumnProps) {
   const clamped = Math.min(100, Math.max(0, waterLevel));
   const activeCount = Math.round((clamped / 100) * WATER_LED_SEGMENT_COUNT);
@@ -96,6 +99,7 @@ export function WaterLevelColumn({
           triggerLevelLow={triggerLevelLow}
           onTriggerLevelHighChange={onTriggerLevelHighChange}
           onTriggerLevelLowChange={onTriggerLevelLowChange}
+          disabled={locked}
         />
       </Box>
 

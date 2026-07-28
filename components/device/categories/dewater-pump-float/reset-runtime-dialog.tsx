@@ -30,7 +30,7 @@ export function ResetRuntimeDialog({
       <DialogTitle>Reset pump {pumpId} runtime?</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary">
-          This clears the current runtime of{" "}
+          This clears the current session runtime of{" "}
           <Typography component="span" variant="body2" color="text.primary" sx={{ fontWeight: 600 }}>
             {currentRuntimeLabel}
           </Typography>{" "}

@@ -43,6 +43,9 @@ const MAX_ADC_SAMPLES = 1000;
 // Same bound for the derived water-level history (see waterLevelSamples).
 const MAX_WATER_LEVEL_SAMPLES = 1000;
 
+/** Default round-trip budget for a reply to a single config command. */
+const REPLY_TIMEOUT_MS = 10000;
+
 // Turns a firmware JSON field name (e.g. "flow_rate_lpm") into a display label.
 function humanizeKey(key: string): string {
   return key
@@ -89,6 +92,17 @@ interface BluetoothContextValue {
   commandLog: CommandLogEntry[];
   samplePeriodMs: number | null;
   sendCommand: (commandObj: unknown) => Promise<void>;
+  /**
+   * Sends `commandObj` and resolves with the first inbound JSON line matching
+   * `predicate` — or null if none arrives within `timeoutMs`, or the link drops
+   * first. Unlike `sendCommand` (which resolves once the write lands), this
+   * waits for the device to answer, so a caller can confirm a setting stuck.
+   */
+  sendCommandAndWait: (
+    commandObj: unknown,
+    predicate: (json: Record<string, unknown>) => boolean,
+    timeoutMs?: number,
+  ) => Promise<Record<string, unknown> | null>;
   setSamplePeriodSeconds: (seconds: number) => Promise<void>;
   sendGetConfig: () => Promise<void>;
   clearCommandLog: () => void;
@@ -611,6 +625,20 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const sendCommandAndWait = useCallback(
+    async (
+      commandObj: unknown,
+      predicate: (json: Record<string, unknown>) => boolean,
+      timeoutMs: number = REPLY_TIMEOUT_MS,
+    ) => {
+      // Registered before the write, or a reply that beats this line is missed.
+      const reply = waitForReply(predicate, timeoutMs);
+      await sendCommand(commandObj);
+      return reply;
+    },
+    [sendCommand, waitForReply],
+  );
+
   // Provisioning protocol: firmware blocks until it gets setup_device (silent,
   // no reply) then confirm_setup (replies ok/error), then reboots (~15-20s).
   // The HM-10 link can take ~18s for the confirm_setup round trip alone (BLE
@@ -812,6 +840,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       commandLog,
       samplePeriodMs,
       sendCommand,
+      sendCommandAndWait,
       setSamplePeriodSeconds,
       sendGetConfig,
       clearCommandLog,
@@ -838,6 +867,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       commandLog,
       samplePeriodMs,
       sendCommand,
+      sendCommandAndWait,
       setSamplePeriodSeconds,
       sendGetConfig,
       clearCommandLog,

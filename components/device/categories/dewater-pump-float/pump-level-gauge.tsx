@@ -28,6 +28,11 @@ interface PumpLevelGaugeProps {
   onTriggerLevelLowChange: (level: number) => void;
   /** Drops the band colors and locks the sliders — the pump is switched off. */
   disabled?: boolean;
+  /**
+   * Locks the sliders without dimming anything — the dashboard is read-only,
+   * so the gauge keeps reading as normal.
+   */
+  locked?: boolean;
 }
 
 const SEGMENT_COLORS = {
@@ -53,6 +58,7 @@ export function PumpLevelGauge({
   onTriggerLevelHighChange,
   onTriggerLevelLowChange,
   disabled = false,
+  locked = false,
 }: PumpLevelGaugeProps) {
   const segments = useMemo(
     () => Array.from({ length: WATER_LED_SEGMENT_COUNT }, (_, i) => i),
@@ -99,7 +105,7 @@ export function PumpLevelGauge({
           triggerLevelLow={triggerLevelLow}
           onTriggerLevelHighChange={onTriggerLevelHighChange}
           onTriggerLevelLowChange={onTriggerLevelLowChange}
-          disabled={disabled}
+          disabled={disabled || locked}
         />
       </Box>
 
