@@ -11,11 +11,11 @@ export interface EchoCommand {
   command: Record<string, string>;
 }
 
-// Pump high/low settings are a raw 0-100 setting, not an ADC value — the
-// firmware maps this internally to a real current_water_level trigger point
-// (HIGH -> upper half 50-100%, LOW -> lower half 0-50%), which matches the
-// PWA slider's own per-zone 0-100 scale 1:1. See dewater-pump-float firmware
-// README "Pump ON/OFF control".
+// Pump high/low settings are a 0-100 percentage of current_water_level, not
+// an ADC value: the pump turns on above HIGH and off below LOW. Both sliders
+// span the full water-level range (they may meet but not cross), so the value
+// sent is the trigger point itself — no half-range remapping on either side.
+// See dewater-pump-float firmware README "Pump ON/OFF control".
 export const PUMP_THRESHOLD_PERCENT_MIN = 0;
 export const PUMP_THRESHOLD_PERCENT_MAX = 100;
 

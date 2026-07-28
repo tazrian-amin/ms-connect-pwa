@@ -28,8 +28,6 @@ export const PumpMonitoringPalette = {
 export const PUMP_COUNT = 6;
 
 export const WATER_LED_SEGMENT_COUNT = 64;
-/** Bottom half of the pump column uses red; top half uses green. */
-export const PUMP_LED_ZONE_SEGMENT_COUNT = WATER_LED_SEGMENT_COUNT / 2;
 
 export const LED_COLUMN_WIDTH = 72;
 export const LED_COLUMN_PADDING = 8;
@@ -49,24 +47,19 @@ export const LED_COLUMN_HEIGHT = LED_STACK_HEIGHT + LED_COLUMN_PADDING * 2;
 
 export const LED_STACK_OFFSET_Y = LED_COLUMN_PADDING;
 
-export const LED_ZONE_DIVIDER_HEIGHT = 2;
-
-/** Height of one green or red zone inside the pump LED stack. */
-export const PUMP_LED_ZONE_HEIGHT =
-  (LED_STACK_HEIGHT - LED_ZONE_DIVIDER_HEIGHT) / 2;
-
-/** Green (HIGH) zone — top of the pump LED stack. */
-export const PUMP_GREEN_ZONE_TOP = LED_STACK_OFFSET_Y;
-export const PUMP_GREEN_ZONE_BOTTOM =
-  LED_STACK_OFFSET_Y + PUMP_LED_ZONE_HEIGHT;
-
-/** Red (LOW) zone — bottom of the pump LED stack. */
-export const PUMP_RED_ZONE_TOP =
-  LED_STACK_OFFSET_Y + PUMP_LED_ZONE_HEIGHT + LED_ZONE_DIVIDER_HEIGHT;
-export const PUMP_RED_ZONE_BOTTOM = LED_STACK_OFFSET_Y + LED_STACK_HEIGHT;
+/**
+ * Both threshold sliders travel the whole LED stack — 0 = bottom segment,
+ * 100 = top segment — so their values read as absolute water-level percent.
+ */
+export const THRESHOLD_TRACK_TOP = LED_STACK_OFFSET_Y;
+export const THRESHOLD_TRACK_HEIGHT = LED_STACK_HEIGHT;
 
 export const THRESHOLD_POINTER_HEIGHT = 18;
 export const THRESHOLD_POINTER_WIDTH = LED_COLUMN_WIDTH + 10;
+/** Exact-threshold marker drawn under the label pill. */
+export const THRESHOLD_MARKER_HEIGHT = 2;
+/** Kept between the two label pills once the thresholds converge. */
+export const THRESHOLD_POINTER_MIN_GAP = 2;
 
 export const DASHBOARD_MIN_WIDTH = 920;
 export const COLUMN_GAP = 20;

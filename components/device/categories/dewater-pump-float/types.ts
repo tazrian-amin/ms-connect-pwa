@@ -1,14 +1,17 @@
 export type PumpStatus = {
   id: number;
-  /** 0–100 within the green (HIGH) zone; 0 = zone bottom, 100 = zone top. */
+  /** Water level % that turns the pump on; 0 = column bottom, 100 = top. */
   triggerLevelHigh: number;
-  /** 0–100 within the red (LOW) zone; 0 = zone bottom, 100 = zone top. */
+  /** Water level % that turns the pump off; never above `triggerLevelHigh`. */
   triggerLevelLow: number;
   runtimeHours: number;
 };
 
 export type PumpMonitoringData = {
   waterLevel: number;
+  /** Water column's own trigger band, independent of the per-pump triggers. */
+  waterTriggerLevelHigh: number;
+  waterTriggerLevelLow: number;
   pumps: PumpStatus[];
 };
 

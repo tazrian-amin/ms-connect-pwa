@@ -9,14 +9,36 @@ import {
   ledSegmentBaseSx,
   ledSegmentGlowSx,
 } from "./led-column-shell";
-import { PumpMonitoringPalette, WATER_LED_SEGMENT_COUNT } from "./constants";
+import { ThresholdTrack } from "./threshold-track";
+import {
+  LED_COLUMN_HEIGHT,
+  LED_COLUMN_WIDTH,
+  PumpMonitoringPalette,
+  WATER_LED_SEGMENT_COUNT,
+} from "./constants";
 
 interface WaterLevelColumnProps {
   waterLevel: number;
+  /** 0–100 over the full column; never drops below the LOW threshold. */
+  triggerLevelHigh: number;
+  /** 0–100 over the full column; never rises above the HIGH threshold. */
+  triggerLevelLow: number;
+  onTriggerLevelHighChange: (level: number) => void;
+  onTriggerLevelLowChange: (level: number) => void;
 }
 
-/** Segments render bottom-to-top; index 0 is the lowest LED. */
-export function WaterLevelColumn({ waterLevel }: WaterLevelColumnProps) {
+/**
+ * Live water level, with its own HIGH/LOW threshold sliders overlaid. These
+ * are independent of the per-pump triggers: the LEDs keep showing the raw
+ * level, and the pointers only mark this column's own band.
+ */
+export function WaterLevelColumn({
+  waterLevel,
+  triggerLevelHigh,
+  triggerLevelLow,
+  onTriggerLevelHighChange,
+  onTriggerLevelLowChange,
+}: WaterLevelColumnProps) {
   const clamped = Math.min(100, Math.max(0, waterLevel));
   const activeCount = Math.round((clamped / 100) * WATER_LED_SEGMENT_COUNT);
   const segments = useMemo(
@@ -30,21 +52,38 @@ export function WaterLevelColumn({ waterLevel }: WaterLevelColumnProps) {
         Water Level
       </Typography>
 
-      <LedColumnShell>
-        {segments.map((index) => {
-          const active = index < activeCount;
-          return (
-            <Box
-              key={index}
-              sx={{
-                ...ledSegmentBaseSx,
-                bgcolor: active ? PumpMonitoringPalette.waterActive : PumpMonitoringPalette.segmentInactive,
-                ...(active ? ledSegmentGlowSx(PumpMonitoringPalette.waterActiveGlow) : {}),
-              }}
-            />
-          );
-        })}
-      </LedColumnShell>
+      <Box sx={{ width: LED_COLUMN_WIDTH, height: LED_COLUMN_HEIGHT, position: "relative" }}>
+        <LedColumnShell>
+          {segments.map((index) => {
+            const active = index < activeCount;
+            return (
+              <Box
+                key={index}
+                sx={{
+                  ...ledSegmentBaseSx,
+                  bgcolor: active ? PumpMonitoringPalette.waterActive : PumpMonitoringPalette.segmentInactive,
+                  ...(active ? ledSegmentGlowSx(PumpMonitoringPalette.waterActiveGlow) : {}),
+                }}
+              />
+            );
+          })}
+        </LedColumnShell>
+
+        <ThresholdTrack
+          name="Water level"
+          triggerLevelHigh={triggerLevelHigh}
+          triggerLevelLow={triggerLevelLow}
+          onTriggerLevelHighChange={onTriggerLevelHighChange}
+          onTriggerLevelLowChange={onTriggerLevelLowChange}
+        />
+      </Box>
+
+      <Typography sx={{ mt: 0.75, fontSize: 11, color: PumpMonitoringPalette.textMuted, fontWeight: 500 }}>
+        High {triggerLevelHigh}%
+      </Typography>
+      <Typography sx={{ fontSize: 11, color: PumpMonitoringPalette.textMuted, fontWeight: 500 }}>
+        Low {triggerLevelLow}%
+      </Typography>
 
       <Box
         sx={{

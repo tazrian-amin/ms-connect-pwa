@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo } from "react";
+import { useMemo } from "react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 
@@ -9,34 +9,40 @@ import {
   ledSegmentBaseSx,
   ledSegmentGlowSx,
 } from "./led-column-shell";
-import { isPumpLedSegmentActive } from "./pump-led-threshold-logic";
-import { PumpThresholdPointer } from "./pump-threshold-pointer";
+import { getPumpLedSegmentState } from "./pump-led-threshold-logic";
+import { ThresholdTrack } from "./threshold-track";
 import {
   LED_COLUMN_HEIGHT,
   LED_COLUMN_WIDTH,
-  LED_ZONE_DIVIDER_HEIGHT,
-  PUMP_GREEN_ZONE_BOTTOM,
-  PUMP_GREEN_ZONE_TOP,
-  PUMP_LED_ZONE_SEGMENT_COUNT,
-  PUMP_RED_ZONE_BOTTOM,
-  PUMP_RED_ZONE_TOP,
   PumpMonitoringPalette,
   WATER_LED_SEGMENT_COUNT,
 } from "./constants";
 
 interface PumpLevelGaugeProps {
-  /** 0–100 within the red (LOW) zone; bottom portion stays lit. */
+  /** 0–100 over the full column; segments below it stay lit red. */
   triggerLevelLow: number;
-  /** 0–100 within the green (HIGH) zone; bottom portion stays dark. */
+  /** 0–100 over the full column; segments above it stay lit green. */
   triggerLevelHigh: number;
   onTriggerLevelHighChange: (level: number) => void;
   onTriggerLevelLowChange: (level: number) => void;
 }
 
+const SEGMENT_COLORS = {
+  red: {
+    color: PumpMonitoringPalette.redActive,
+    glow: PumpMonitoringPalette.redActiveGlow,
+  },
+  green: {
+    color: PumpMonitoringPalette.greenActive,
+    glow: PumpMonitoringPalette.greenActiveGlow,
+  },
+  off: { color: PumpMonitoringPalette.segmentInactive, glow: undefined },
+} as const;
+
 /**
- * Pump LED column (red zone bottom, divider, green zone top) with its two
- * draggable HIGH/LOW threshold sliders overlaid. LEDs between the LOW and
- * HIGH thresholds are off; the outer bands are on.
+ * Pump LED column with its two draggable HIGH/LOW threshold sliders overlaid.
+ * Both sliders travel the full column and may meet but not cross, so the lit
+ * bands they bound (red below LOW, green above HIGH) can be any size.
  */
 export function PumpLevelGauge({
   triggerLevelLow,
@@ -54,49 +60,29 @@ export function PumpLevelGauge({
       <Box sx={{ width: LED_COLUMN_WIDTH, height: LED_COLUMN_HEIGHT, position: "relative" }}>
         <LedColumnShell>
           {segments.map((index) => {
-            const active = isPumpLedSegmentActive(index, triggerLevelLow, triggerLevelHigh);
-            const inRedZone = index < PUMP_LED_ZONE_SEGMENT_COUNT;
-            const activeColor = inRedZone ? PumpMonitoringPalette.redActive : PumpMonitoringPalette.greenActive;
-            const activeGlow = inRedZone ? PumpMonitoringPalette.redActiveGlow : PumpMonitoringPalette.greenActiveGlow;
+            const { color, glow } = SEGMENT_COLORS[
+              getPumpLedSegmentState(index, triggerLevelLow, triggerLevelHigh)
+            ];
 
             return (
-              <Fragment key={index}>
-                {index === PUMP_LED_ZONE_SEGMENT_COUNT ? (
-                  <Box
-                    sx={{
-                      width: "100%",
-                      height: LED_ZONE_DIVIDER_HEIGHT,
-                      borderRadius: "1px",
-                      bgcolor: PumpMonitoringPalette.borderMuted,
-                      my: "1px",
-                    }}
-                  />
-                ) : null}
-                <Box
-                  sx={{
-                    ...ledSegmentBaseSx,
-                    bgcolor: active ? activeColor : PumpMonitoringPalette.segmentInactive,
-                    ...(active ? ledSegmentGlowSx(activeGlow) : {}),
-                  }}
-                />
-              </Fragment>
+              <Box
+                key={index}
+                sx={{
+                  ...ledSegmentBaseSx,
+                  bgcolor: color,
+                  ...ledSegmentGlowSx(glow),
+                }}
+              />
             );
           })}
         </LedColumnShell>
 
-        <PumpThresholdPointer
-          label="HIGH"
-          value={triggerLevelHigh}
-          zoneTop={PUMP_GREEN_ZONE_TOP}
-          zoneBottom={PUMP_GREEN_ZONE_BOTTOM}
-          onValueChange={onTriggerLevelHighChange}
-        />
-        <PumpThresholdPointer
-          label="LOW"
-          value={triggerLevelLow}
-          zoneTop={PUMP_RED_ZONE_TOP}
-          zoneBottom={PUMP_RED_ZONE_BOTTOM}
-          onValueChange={onTriggerLevelLowChange}
+        <ThresholdTrack
+          name="Pump"
+          triggerLevelHigh={triggerLevelHigh}
+          triggerLevelLow={triggerLevelLow}
+          onTriggerLevelHighChange={onTriggerLevelHighChange}
+          onTriggerLevelLowChange={onTriggerLevelLowChange}
         />
       </Box>
 

@@ -118,6 +118,18 @@ export function PumpMonitoringDashboard({
     [isConnected, sendCommand],
   );
 
+  // The water column's own trigger band is UI-only for now: the retrofit
+  // float command set has no key for it, so the value is held locally and
+  // nothing goes over BLE. Once the firmware names one, send it here the same
+  // way setTriggerLevelHigh/Low below do.
+  const setWaterTriggerLevelHigh = useCallback((level: number) => {
+    setData((prev) => ({ ...prev, waterTriggerLevelHigh: level }));
+  }, []);
+
+  const setWaterTriggerLevelLow = useCallback((level: number) => {
+    setData((prev) => ({ ...prev, waterTriggerLevelLow: level }));
+  }, []);
+
   const setTriggerLevelHigh = useCallback(
     (pumpId: number, level: number) => {
       setData((prev) => ({
@@ -180,7 +192,13 @@ export function PumpMonitoringDashboard({
               minWidth: { xs: 0, md: DASHBOARD_MIN_WIDTH },
             }}
           >
-            <WaterLevelColumn waterLevel={waterLevel} />
+            <WaterLevelColumn
+              waterLevel={waterLevel}
+              triggerLevelHigh={data.waterTriggerLevelHigh}
+              triggerLevelLow={data.waterTriggerLevelLow}
+              onTriggerLevelHighChange={setWaterTriggerLevelHigh}
+              onTriggerLevelLowChange={setWaterTriggerLevelLow}
+            />
             <Box
               sx={{
                 display: "flex",

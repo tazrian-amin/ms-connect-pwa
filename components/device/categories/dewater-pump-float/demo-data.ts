@@ -9,11 +9,16 @@ export function createDemoPumpMonitoringData(): PumpMonitoringData {
     const id = pumpIndex + 1;
     return {
       id,
-      triggerLevelHigh: 0,
-      triggerLevelLow: 50,
+      triggerLevelHigh: 50,
+      triggerLevelLow: 25,
       runtimeHours: 0,
     };
   });
 
-  return { waterLevel, pumps };
+  return {
+    waterLevel,
+    waterTriggerLevelHigh: 75,
+    waterTriggerLevelLow: 25,
+    pumps,
+  };
 }
