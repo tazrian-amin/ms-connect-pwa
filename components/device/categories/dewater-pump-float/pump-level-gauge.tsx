@@ -5,6 +5,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 
 import {
+  LedColumnPendingOverlay,
   LedColumnShell,
   ledSegmentBaseSx,
   ledSegmentGlowSx,
@@ -33,6 +34,11 @@ interface PumpLevelGaugeProps {
    * so the gauge keeps reading as normal.
    */
   locked?: boolean;
+  /**
+   * A threshold change is with the device. The pointers stay where the device
+   * has them until it answers, under a waiting overlay.
+   */
+  pending?: boolean;
 }
 
 const SEGMENT_COLORS = {
@@ -59,6 +65,7 @@ export function PumpLevelGauge({
   onTriggerLevelLowChange,
   disabled = false,
   locked = false,
+  pending = false,
 }: PumpLevelGaugeProps) {
   const segments = useMemo(
     () => Array.from({ length: WATER_LED_SEGMENT_COUNT }, (_, i) => i),
@@ -105,8 +112,10 @@ export function PumpLevelGauge({
           triggerLevelLow={triggerLevelLow}
           onTriggerLevelHighChange={onTriggerLevelHighChange}
           onTriggerLevelLowChange={onTriggerLevelLowChange}
-          disabled={disabled || locked}
+          disabled={disabled || locked || pending}
         />
+
+        {pending && <LedColumnPendingOverlay />}
       </Box>
 
       <Typography sx={{ mt: 0.75, fontSize: 11, color: PumpMonitoringPalette.textMuted, fontWeight: 500 }}>

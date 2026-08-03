@@ -24,9 +24,22 @@ import {
 
 export type ThresholdPointerLabel = "HIGH" | "LOW";
 
+/**
+ * Pill text for the two pointers, separate from the labels the drag logic
+ * keys on — a column can name its band whatever its readouts call it.
+ */
+export interface ThresholdPointerText {
+  high: string;
+  low: string;
+}
+
+const DEFAULT_POINTER_TEXT: ThresholdPointerText = { high: "HIGH", low: "LOW" };
+
 interface ThresholdTrackProps {
   /** Subject of the sliders, e.g. "Pump" — used for the accessible names. */
   name: string;
+  /** Overrides the HIGH/LOW pill text (and the accessible names with it). */
+  pointerText?: ThresholdPointerText;
   /** 0–100 over the full column; never drops below `low`. */
   triggerLevelHigh: number;
   /** 0–100 over the full column; never rises above `high`. */
@@ -62,7 +75,7 @@ function pointerUnderPress(
 
 function ThresholdPointer({
   name,
-  label,
+  text,
   layout,
   value,
   valueMin,
@@ -70,7 +83,7 @@ function ThresholdPointer({
   disabled,
 }: {
   name: string;
-  label: ThresholdPointerLabel;
+  text: string;
   layout: ThresholdPointerLayout;
   value: number;
   valueMin: number;
@@ -80,7 +93,7 @@ function ThresholdPointer({
   return (
     <Box
       role="slider"
-      aria-label={`${name} ${label.toLowerCase()} trigger level`}
+      aria-label={`${name} ${text.toLowerCase()} trigger level`}
       aria-valuemin={valueMin}
       aria-valuemax={valueMax}
       aria-valuenow={value}
@@ -122,7 +135,7 @@ function ThresholdPointer({
             color: PumpMonitoringPalette.thresholdPointerGrip,
           }}
         >
-          {label}
+          {text}
         </Typography>
       </Box>
     </Box>
@@ -139,6 +152,7 @@ function ThresholdPointer({
  */
 export function ThresholdTrack({
   name,
+  pointerText = DEFAULT_POINTER_TEXT,
   triggerLevelHigh,
   triggerLevelLow,
   onTriggerLevelHighChange,
@@ -219,7 +233,7 @@ export function ThresholdTrack({
       {/* LOW first so HIGH stacks above it where the two overlap. */}
       <ThresholdPointer
         name={name}
-        label="LOW"
+        text={pointerText.low}
         layout={layout.low}
         value={lowLevel}
         valueMin={0}
@@ -228,7 +242,7 @@ export function ThresholdTrack({
       />
       <ThresholdPointer
         name={name}
-        label="HIGH"
+        text={pointerText.high}
         layout={layout.high}
         value={highLevel}
         valueMin={lowLevel}

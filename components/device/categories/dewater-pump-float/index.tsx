@@ -85,7 +85,8 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
       <TelemetryChart
         samples={samples}
         title="Water Level Telemetry"
-        seriesLabel="Water Level"
+        seriesLabel="Water Level (%)"
+        seriesColor={PumpMonitoringPalette.waterActive}
         unit="%"
         yDomain={[0, 100]}
         emptyMessage="Waiting for water level readings from the device..."
@@ -93,13 +94,13 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
         referenceLines={[
           {
             value: waterTriggerLevelHigh,
-            label: "High Threshold",
+            label: "Max Threshold",
             color: PumpMonitoringPalette.redActive,
           },
           {
             value: waterTriggerLevelLow,
-            label: "Low Threshold",
-            color: PumpMonitoringPalette.redActive,
+            label: "Min Threshold",
+            color: PumpMonitoringPalette.amberActive,
           },
         ]}
       />

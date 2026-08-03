@@ -12,7 +12,7 @@ import type { AdcSample } from "@/types/bluetooth";
 export interface TelemetryReferenceLine {
   /** Position on the y-axis, in the same units as the samples. */
   value: number;
-  /** Legend label; the level itself is only shown in the tooltip. */
+  /** Legend label. The level is appended to it, e.g. "Max Threshold (22)". */
   label: string;
   color: string;
 }
@@ -23,6 +23,8 @@ interface TelemetryChartProps {
   title?: string;
   /** Legend label for the plotted series. */
   seriesLabel?: string;
+  /** Line/mark color for the plotted series. Defaults to the chart palette. */
+  seriesColor?: string;
   /** Shown while no samples have arrived yet. */
   emptyMessage?: string;
   /** Unit suffix appended to values in the y-axis ticks and tooltip (e.g. "%"). */
@@ -86,6 +88,7 @@ export function TelemetryChart({
   samples,
   title = "Live Telemetry",
   seriesLabel = "Raw ADC Value",
+  seriesColor,
   emptyMessage = "Waiting for ADC readings from the device...",
   unit,
   yDomain,
@@ -144,7 +147,7 @@ export function TelemetryChart({
   const referenceSeries = referenceLines.map((line, index) => ({
     id: `reference-${index}`,
     data: xAxisData.map(() => line.value),
-    label: line.label,
+    label: `${line.label} (${line.value})`,
     color: line.color,
     showMark: false,
     valueFormatter: formatValue,
@@ -166,7 +169,13 @@ export function TelemetryChart({
               width={width}
               height={CHART_HEIGHT}
               series={[
-                { id: "raw", data: seriesData, label: seriesLabel, valueFormatter: formatValue },
+                {
+                  id: "raw",
+                  data: seriesData,
+                  label: seriesLabel,
+                  color: seriesColor,
+                  valueFormatter: formatValue,
+                },
                 ...(average !== null
                   ? [
                       {

@@ -20,6 +20,9 @@
   --panel-text: #111827;
   --panel-text-muted: #6b7280;
   --panel-control-bg: #e5e7eb;
+  --panel-notice-bg: rgba(59, 130, 246, 0.12);
+  --panel-notice-border: rgba(59, 130, 246, 0.35);
+  --panel-notice-text: #1d4ed8;
 }
 
 @theme inline {
@@ -47,6 +50,9 @@
     --panel-text: #fafafa;
     --panel-text-muted: #a1a1aa;
     --panel-control-bg: #27272a;
+    --panel-notice-bg: rgba(59, 130, 246, 0.18);
+    --panel-notice-border: rgba(96, 165, 250, 0.45);
+    --panel-notice-text: #93c5fd;
   }
 }
 

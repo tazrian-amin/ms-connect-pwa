@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Box, { type BoxProps } from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
 
 import {
   LED_COLUMN_HEIGHT,
@@ -26,6 +27,32 @@ export const ledSegmentBaseSx = {
 /** Glow applied to a lit segment; mirrors the RN shadow-based glow. */
 export function ledSegmentGlowSx(glowColor?: string): { boxShadow?: string } {
   return glowColor ? { boxShadow: `0 0 6px ${glowColor}` } : {};
+}
+
+/**
+ * Covers a column whose threshold change is still with the device. Sits over
+ * the pointers (which are z-index 2) so the band can't be dragged again before
+ * the device has answered the last drag, and reads as the wait rather than as
+ * a value — the pointers underneath still show what the device has now.
+ */
+export function LedColumnPendingOverlay() {
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 3,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: `${LED_COLUMN_WIDTH / 6}px`,
+        bgcolor: "rgba(100, 116, 139, 0.25)",
+      }}
+    >
+      <CircularProgress size={22} />
+    </Box>
+  );
 }
 
 /** Fixed-height column with the LED stack vertically centered inside. */

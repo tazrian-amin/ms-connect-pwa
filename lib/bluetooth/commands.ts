@@ -74,13 +74,33 @@ export const retrofitFloatCommands = {
   }),
   setBleMode: (mode: "normal" | "sleep") => ({ set_ble_mode: mode }),
   resetBle: () => ({ reset_ble: "1" }),
-  /** `pump` is 1–6; `percent` (0–100, the raw setting shown on the PWA slider) is clamped 0–100. */
-  setPumpHighThreshold: (pump: number, percent: number) => ({
-    [`pump_${pump}_set_high`]: String(clampPumpThreshold(percent)),
+  /**
+   * Reads back the whole block — per pump: state, enable flag, runtime and
+   * start counters; per column: thresholds and which pump is bound to it; plus
+   * the water level, minimum off time, water band and alteration mode. The
+   * dashboard's hydrate-on-connect: the device owns every one of those, and
+   * nothing else reports the thresholds, enable flags or bindings.
+   */
+  getPumpStates: () => ({ cmd: "get_pump_states" }),
+  /**
+   * Thresholds belong to the *column*, not to the pump. Off alteration that is
+   * the same thing — column N is pump N — but on, the column is a role and
+   * whichever pump the device has bound to it answers these levels.
+   * `column` is 1–6; `percent` (0–100, the raw slider setting) is clamped.
+   */
+  setColumnHighThreshold: (column: number, percent: number) => ({
+    [`column_${column}_set_high`]: String(clampPumpThreshold(percent)),
   }),
-  /** `pump` is 1–6; `percent` (0–100, the raw setting shown on the PWA slider) is clamped 0–100. */
-  setPumpLowThreshold: (pump: number, percent: number) => ({
-    [`pump_${pump}_set_low`]: String(clampPumpThreshold(percent)),
+  setColumnLowThreshold: (column: number, percent: number) => ({
+    [`column_${column}_set_low`]: String(clampPumpThreshold(percent)),
+  }),
+  /**
+   * How the device shares demand across the enabled pumps: 0 = off (column N
+   * is pump N), 1 = rotate to equalize starts, 2 = rotate to equalize run
+   * time. A control setting, not a view preference — the device owns it.
+   */
+  setAlterationMode: (mode: number) => ({
+    set_alteration_mode: String(clampInt(mode, 0, 2)),
   }),
   /**
    * `pump` is 1–6. UPCOMING FIRMWARE FEATURE — key name is provisional.
@@ -100,16 +120,60 @@ export const retrofitFloatCommands = {
       clampInt(minutes, RETROFIT_PUMP_MIN_OFF_TIME_MIN, RETROFIT_PUMP_MIN_OFF_TIME_MAX),
     ),
   }),
-  echoPumpHighThreshold: (pump: number) => ({
-    echo: `pump_${pump}_high_thr`,
+  /**
+   * `pump` is 1–6. Zeroes that pump's session runtime; the lifetime total is
+   * never resettable. The device answers with the counter, so the reply is
+   * what the UI reads the new value from.
+   */
+  resetPumpRuntime: (pump: number) => ({
+    [`pump_${pump}_reset_runtime`]: "1",
   }),
-  echoPumpLowThreshold: (pump: number) => ({
-    echo: `pump_${pump}_low_thr`,
+  /**
+   * `pump` is 1–6. Zeroes that pump's session start count and nothing else —
+   * the session runtime and both lifetime totals are left as they are. Same
+   * shape as the runtime reset: the device answers with the counter.
+   *
+   * UPCOMING FIRMWARE FEATURE — key name is provisional. Today's firmware has
+   * no separate key: `pump_N_reset_runtime` clears the whole session pair, so
+   * until it lands this command is answered as unknown.
+   */
+  resetPumpStarts: (pump: number) => ({
+    [`pump_${pump}_reset_starts`]: "1",
   }),
+  /**
+   * Water-level alarm band, as absolute water-level percentages (0–100). The
+   * device stores and reports them; no alarm output is wired to them yet.
+   */
+  setWaterHighThreshold: (percent: number) => ({
+    set_water_high_thr: String(clampPumpThreshold(percent)),
+  }),
+  setWaterLowThreshold: (percent: number) => ({
+    set_water_low_thr: String(clampPumpThreshold(percent)),
+  }),
+  echoColumnHighThreshold: (column: number) => ({
+    echo: `column_${column}_high_thr`,
+  }),
+  echoColumnLowThreshold: (column: number) => ({
+    echo: `column_${column}_low_thr`,
+  }),
+  echoAlterationMode: () => ({ echo: "alteration_mode" }),
   echoPumpEnabled: (pump: number) => ({
     echo: `pump_${pump}_enabled`,
   }),
+  /** Which pump the device has bound to this column; 0 = none yet (T.B.D.). */
+  echoColumnPump: (column: number) => ({
+    echo: `column_${column}_pump`,
+  }),
+  /** Lifetime starts, and starts since the operator's last reset. */
+  echoPumpTotalStarts: (pump: number) => ({
+    echo: `pump_${pump}_total_starts`,
+  }),
+  echoPumpCurrentStarts: (pump: number) => ({
+    echo: `pump_${pump}_current_starts`,
+  }),
   echoPumpMinOffTime: () => ({ echo: "pump_min_off_time_min" }),
+  echoWaterHighThreshold: () => ({ echo: "water_high_thr" }),
+  echoWaterLowThreshold: () => ({ echo: "water_low_thr" }),
   // Flat-style identity commands — same effect as cmd-style "set_config":
   // the MCU saves the field(s) and resets to sync with Notehub.
   setProductUid: (uid: string) => ({ set_product_uid: uid }),
@@ -173,18 +237,42 @@ const RETROFIT_FLOAT_ECHO_COMMANDS: EchoCommand[] = [
     label: "Pump min off time (min)",
     command: retrofitFloatCommands.echoPumpMinOffTime(),
   },
-  ...Array.from({ length: 6 }, (_, i) => i + 1).flatMap((pump) => [
+  {
+    label: "Water high threshold",
+    command: retrofitFloatCommands.echoWaterHighThreshold(),
+  },
+  {
+    label: "Water low threshold",
+    command: retrofitFloatCommands.echoWaterLowThreshold(),
+  },
+  {
+    label: "Alteration mode",
+    command: retrofitFloatCommands.echoAlterationMode(),
+  },
+  ...Array.from({ length: 6 }, (_, i) => i + 1).flatMap((n) => [
     {
-      label: `Pump ${pump} high thr`,
-      command: retrofitFloatCommands.echoPumpHighThreshold(pump),
+      label: `Column ${n} high thr`,
+      command: retrofitFloatCommands.echoColumnHighThreshold(n),
     },
     {
-      label: `Pump ${pump} low thr`,
-      command: retrofitFloatCommands.echoPumpLowThreshold(pump),
+      label: `Column ${n} low thr`,
+      command: retrofitFloatCommands.echoColumnLowThreshold(n),
     },
     {
-      label: `Pump ${pump} enabled`,
-      command: retrofitFloatCommands.echoPumpEnabled(pump),
+      label: `Column ${n} pump`,
+      command: retrofitFloatCommands.echoColumnPump(n),
+    },
+    {
+      label: `Pump ${n} enabled`,
+      command: retrofitFloatCommands.echoPumpEnabled(n),
+    },
+    {
+      label: `Pump ${n} total starts`,
+      command: retrofitFloatCommands.echoPumpTotalStarts(n),
+    },
+    {
+      label: `Pump ${n} current starts`,
+      command: retrofitFloatCommands.echoPumpCurrentStarts(n),
     },
   ]),
 ];
@@ -261,18 +349,22 @@ const RETROFIT_FLOAT_CONFIG_COMMANDS: ConfigCommandTemplate[] = [
     label: "Pump min off time (min)",
     command: retrofitFloatCommands.setPumpMinOffTimeMin(15),
   },
-  ...Array.from({ length: 6 }, (_, i) => i + 1).flatMap((pump) => [
+  {
+    label: "Alteration mode",
+    command: retrofitFloatCommands.setAlterationMode(1),
+  },
+  ...Array.from({ length: 6 }, (_, i) => i + 1).flatMap((n) => [
     {
-      label: `Pump ${pump} high (%)`,
-      command: retrofitFloatCommands.setPumpHighThreshold(pump, 65),
+      label: `Column ${n} high (%)`,
+      command: retrofitFloatCommands.setColumnHighThreshold(n, 65),
     },
     {
-      label: `Pump ${pump} low (%)`,
-      command: retrofitFloatCommands.setPumpLowThreshold(pump, 30),
+      label: `Column ${n} low (%)`,
+      command: retrofitFloatCommands.setColumnLowThreshold(n, 30),
     },
     {
-      label: `Pump ${pump} enable`,
-      command: retrofitFloatCommands.setPumpEnabled(pump, true),
+      label: `Pump ${n} enable`,
+      command: retrofitFloatCommands.setPumpEnabled(n, true),
     },
   ]),
 ];
