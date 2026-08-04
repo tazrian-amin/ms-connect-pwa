@@ -12,7 +12,9 @@ import { formatResetTime, type LastResetTimes } from "./use-last-reset";
 
 /** The four preformatted figures one column's counter rows show. */
 export interface PumpCounterLabels {
-  /** Lifetime runtime since installation, e.g. "2d 4h 23m". Not resettable. */
+  /** Lifetime runtime since installation, e.g. "2d 4h 23m" — or "2y 1d 4h" once
+   * it passes a year, where the minute stops being worth its width. Not
+   * resettable. */
   totalRuntime: string;
   /** Runtime since the last reset, same format. */
   currentRuntime: string;

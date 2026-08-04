@@ -23,11 +23,13 @@ export function createDemoPumpMonitoringData(): PumpMonitoringData {
   }));
 
   // Columns default to their own pump, the same arrangement the device reports
-  // with alteration off.
+  // with alteration off. The two levels are feet, and match the firmware's own
+  // defaults (kDefaultColumnHighThr/kDefaultColumnLowThr) so a freshly flashed
+  // device and a disconnected dashboard agree.
   const columns = Array.from({ length: PUMP_COUNT }, (_, columnIndex) => ({
     number: columnIndex + 1,
-    triggerLevelHigh: 50,
-    triggerLevelLow: 25,
+    triggerLevelHigh: 30,
+    triggerLevelLow: 15,
     pumpId: columnIndex + 1,
   }));
 

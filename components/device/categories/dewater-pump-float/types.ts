@@ -54,15 +54,16 @@ export type PumpRunState = "run" | "idle" | "fault" | "disabled";
 export type ColumnStatus = {
   /** 1-based position, matching the firmware's column numbering. */
   number: number;
-  /** Water level % that starts this column's pump. */
+  /** Water depth in feet that starts this column's pump. */
   triggerLevelHigh: number;
-  /** Water level % that stops it; never above `triggerLevelHigh`. */
+  /** Depth in feet that stops it; always at least a foot below the high one. */
   triggerLevelLow: number;
   /** Pump currently bound to this column, or null while none is. */
   pumpId: number | null;
 };
 
 export type PumpMonitoringData = {
+  /** Current depth in feet, 0–60 (see WATER_LEVEL_MAX_FEET). */
   waterLevel: number;
   pumps: PumpStatus[];
   columns: ColumnStatus[];

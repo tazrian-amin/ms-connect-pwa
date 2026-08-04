@@ -81,7 +81,7 @@ interface BluetoothContextValue {
   disconnect: () => Promise<void>;
   clearError: () => void;
   adcSamples: AdcSample[];
-  // Time-series of the firmware's current_water_level (%), accumulated from the
+  // Time-series of the firmware's current_water_level (ft), accumulated from the
   // periodic JSON reports so the telemetry chart can plot it over time. `readings`
   // only ever holds the latest value per key, so it can't back a chart on its own.
   waterLevelSamples: AdcSample[];

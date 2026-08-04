@@ -12,6 +12,7 @@ import {
   PUMP_TOGGLE_HEIGHT,
   PumpMonitoringPalette,
   STATUS_INDICATOR_HEIGHT,
+  STATUS_INDICATOR_MAX_WIDTH,
 } from "./constants";
 import {
   PUMP_RUN_STATE_LABELS,
@@ -179,6 +180,7 @@ function StatusIndicator({ runState }: { runState: PumpRunState | null }) {
         alignItems: "center",
         justifyContent: "center",
         width: "100%",
+        maxWidth: STATUS_INDICATOR_MAX_WIDTH,
         height: STATUS_INDICATOR_HEIGHT,
         bgcolor: PumpMonitoringPalette.columnBg,
         border: `1px solid ${PumpMonitoringPalette.borderMuted}`,

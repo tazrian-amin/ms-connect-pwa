@@ -5,23 +5,28 @@ import {
   THRESHOLD_POINTER_MIN_GAP,
   THRESHOLD_TRACK_HEIGHT,
   THRESHOLD_TRACK_TOP,
+  WATER_LEVEL_MAX_FEET,
 } from "./constants";
 
-function clampPercent(value: number) {
-  return Math.min(100, Math.max(0, value));
+export function clampFeet(value: number) {
+  return Math.min(WATER_LEVEL_MAX_FEET, Math.max(0, value));
 }
 
-/** Map 0–100 (stack bottom→top) to the marker's offset from the column top. */
+/** Map 0–60 ft (stack bottom→top) to the marker's offset from the column top. */
 export function levelToTrackOffset(level: number): number {
   return (
-    THRESHOLD_TRACK_TOP + (1 - clampPercent(level) / 100) * THRESHOLD_TRACK_HEIGHT
+    THRESHOLD_TRACK_TOP +
+    (1 - clampFeet(level) / WATER_LEVEL_MAX_FEET) * THRESHOLD_TRACK_HEIGHT
   );
 }
 
-/** Inverse of `levelToTrackOffset`, snapped to whole percent. */
+/**
+ * Inverse of `levelToTrackOffset`, snapped to whole feet — a threshold can
+ * only be set to a depth the column can state, which is one LED per foot.
+ */
 export function trackOffsetToLevel(offset: number): number {
   const travelled = (offset - THRESHOLD_TRACK_TOP) / THRESHOLD_TRACK_HEIGHT;
-  return Math.round(clampPercent(100 * (1 - travelled)));
+  return Math.round(clampFeet(WATER_LEVEL_MAX_FEET * (1 - travelled)));
 }
 
 export interface ThresholdPointerLayout {

@@ -11,13 +11,14 @@ export interface EchoCommand {
   command: Record<string, string>;
 }
 
-// Pump high/low settings are a 0-100 percentage of current_water_level, not
-// an ADC value: the pump turns on above HIGH and off below LOW. Both sliders
-// span the full water-level range (they may meet but not cross), so the value
-// sent is the trigger point itself — no half-range remapping on either side.
+// Pump high/low settings are a water depth in feet, 0-60, on the same scale as
+// current_water_level — not an ADC value and no longer a percentage: the pump
+// turns on above HIGH and off below LOW. Both sliders span the full depth
+// range, so the value sent is the trigger point itself — no half-range
+// remapping on either side.
 // See dewater-pump-float firmware README "Pump ON/OFF control".
-export const PUMP_THRESHOLD_PERCENT_MIN = 0;
-export const PUMP_THRESHOLD_PERCENT_MAX = 100;
+export const PUMP_THRESHOLD_FEET_MIN = 0;
+export const PUMP_THRESHOLD_FEET_MAX = 60;
 
 // Retrofit float ("dewater-pump-float") firmware-enforced numeric ranges —
 // mirrored here so the UI can clamp before round-tripping over BLE.
@@ -37,7 +38,7 @@ function clampInt(value: number, min: number, max: number): number {
 }
 
 function clampPumpThreshold(value: number): number {
-  return clampInt(value, PUMP_THRESHOLD_PERCENT_MIN, PUMP_THRESHOLD_PERCENT_MAX);
+  return clampInt(value, PUMP_THRESHOLD_FEET_MIN, PUMP_THRESHOLD_FEET_MAX);
 }
 
 /** DEWATERING — "Dewater Water Level Monitor" (dewater-water-level). */
@@ -86,13 +87,13 @@ export const retrofitFloatCommands = {
    * Thresholds belong to the *column*, not to the pump. Off alteration that is
    * the same thing — column N is pump N — but on, the column is a role and
    * whichever pump the device has bound to it answers these levels.
-   * `column` is 1–6; `percent` (0–100, the raw slider setting) is clamped.
+   * `column` is 1–6; `feet` (0–60, the raw slider setting) is clamped.
    */
-  setColumnHighThreshold: (column: number, percent: number) => ({
-    [`column_${column}_set_high`]: String(clampPumpThreshold(percent)),
+  setColumnHighThreshold: (column: number, feet: number) => ({
+    [`column_${column}_set_high`]: String(clampPumpThreshold(feet)),
   }),
-  setColumnLowThreshold: (column: number, percent: number) => ({
-    [`column_${column}_set_low`]: String(clampPumpThreshold(percent)),
+  setColumnLowThreshold: (column: number, feet: number) => ({
+    [`column_${column}_set_low`]: String(clampPumpThreshold(feet)),
   }),
   /**
    * How the device shares demand across the enabled pumps: 0 = off (column N
@@ -141,14 +142,14 @@ export const retrofitFloatCommands = {
     [`pump_${pump}_reset_starts`]: "1",
   }),
   /**
-   * Water-level alarm band, as absolute water-level percentages (0–100). The
+   * Water-level alarm band, as absolute water depths in feet (0–60). The
    * device stores and reports them; no alarm output is wired to them yet.
    */
-  setWaterHighThreshold: (percent: number) => ({
-    set_water_high_thr: String(clampPumpThreshold(percent)),
+  setWaterHighThreshold: (feet: number) => ({
+    set_water_high_thr: String(clampPumpThreshold(feet)),
   }),
-  setWaterLowThreshold: (percent: number) => ({
-    set_water_low_thr: String(clampPumpThreshold(percent)),
+  setWaterLowThreshold: (feet: number) => ({
+    set_water_low_thr: String(clampPumpThreshold(feet)),
   }),
   echoColumnHighThreshold: (column: number) => ({
     echo: `column_${column}_high_thr`,
@@ -355,12 +356,12 @@ const RETROFIT_FLOAT_CONFIG_COMMANDS: ConfigCommandTemplate[] = [
   },
   ...Array.from({ length: 6 }, (_, i) => i + 1).flatMap((n) => [
     {
-      label: `Column ${n} high (%)`,
-      command: retrofitFloatCommands.setColumnHighThreshold(n, 65),
+      label: `Column ${n} high (ft)`,
+      command: retrofitFloatCommands.setColumnHighThreshold(n, 40),
     },
     {
-      label: `Column ${n} low (%)`,
-      command: retrofitFloatCommands.setColumnLowThreshold(n, 30),
+      label: `Column ${n} low (ft)`,
+      command: retrofitFloatCommands.setColumnLowThreshold(n, 20),
     },
     {
       label: `Pump ${n} enable`,

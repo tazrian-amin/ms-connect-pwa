@@ -10,20 +10,19 @@ import {
   ledSegmentBaseSx,
   ledSegmentGlowSx,
 } from "./led-column-shell";
+import { GaugeWithScale } from "./level-scale";
 import { getPumpLedSegmentState } from "./pump-led-threshold-logic";
 import { ThresholdTrack } from "./threshold-track";
 import {
-  LED_COLUMN_HEIGHT,
-  LED_COLUMN_WIDTH,
+  LED_SEGMENT_COUNT,
   PUMP_DISABLED_OPACITY,
   PumpMonitoringPalette,
-  WATER_LED_SEGMENT_COUNT,
 } from "./constants";
 
 interface PumpLevelGaugeProps {
-  /** 0–100 over the full column; segments below it stay lit red. */
+  /** Feet over the full column; segments below it stay lit red. */
   triggerLevelLow: number;
-  /** 0–100 over the full column; segments above it stay lit green. */
+  /** Feet over the full column; segments above it stay lit green. */
   triggerLevelHigh: number;
   onTriggerLevelHighChange: (level: number) => void;
   onTriggerLevelLowChange: (level: number) => void;
@@ -54,9 +53,10 @@ const SEGMENT_COLORS = {
 } as const;
 
 /**
- * Pump LED column with its two draggable HIGH/LOW threshold sliders overlaid.
- * Both sliders travel the full column and may meet but not cross, so the lit
- * bands they bound (red below LOW, green above HIGH) can be any size.
+ * Pump LED column with its two draggable HIGH/LOW threshold sliders overlaid,
+ * and a foot scale beside it. Both sliders travel the full 0–60 ft column and
+ * are held a foot apart, so the lit bands they bound (red below LOW, green
+ * above HIGH) can be any size short of meeting.
  */
 export function PumpLevelGauge({
   triggerLevelLow,
@@ -68,21 +68,20 @@ export function PumpLevelGauge({
   pending = false,
 }: PumpLevelGaugeProps) {
   const segments = useMemo(
-    () => Array.from({ length: WATER_LED_SEGMENT_COUNT }, (_, i) => i),
+    () => Array.from({ length: LED_SEGMENT_COUNT }, (_, i) => i),
     [],
   );
 
   return (
     <Box
       sx={{
-        width: LED_COLUMN_WIDTH,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         ...(disabled ? { opacity: PUMP_DISABLED_OPACITY } : {}),
       }}
     >
-      <Box sx={{ width: LED_COLUMN_WIDTH, height: LED_COLUMN_HEIGHT, position: "relative" }}>
+      <GaugeWithScale>
         <LedColumnShell>
           {segments.map((index) => {
             // A disabled pump keeps its band boundaries visible through the
@@ -116,13 +115,13 @@ export function PumpLevelGauge({
         />
 
         {pending && <LedColumnPendingOverlay />}
-      </Box>
+      </GaugeWithScale>
 
       <Typography sx={{ mt: 0.75, fontSize: 11, color: PumpMonitoringPalette.textMuted, fontWeight: 500 }}>
-        High {triggerLevelHigh}%
+        High {triggerLevelHigh} ft
       </Typography>
       <Typography sx={{ fontSize: 11, color: PumpMonitoringPalette.textMuted, fontWeight: 500 }}>
-        Low {triggerLevelLow}%
+        Low {triggerLevelLow} ft
       </Typography>
     </Box>
   );

@@ -50,8 +50,8 @@ import { WaterLevelColumn } from "./water-level-column";
 interface PumpMonitoringDashboardProps {
   data?: PumpMonitoringData;
   /**
-   * The water column's own trigger band. Owned by the parent because the
-   * telemetry chart marks the same two levels.
+   * The water column's own trigger band, in feet. Owned by the parent because
+   * the telemetry chart marks the same two levels.
    */
   waterTriggerLevelHigh: number;
   waterTriggerLevelLow: number;
@@ -60,7 +60,9 @@ interface PumpMonitoringDashboardProps {
 }
 
 // The firmware pushes these as plain JSON keys (see bluetooth-provider's
-// generic reading fan-out) rather than as a dedicated context field.
+// generic reading fan-out) rather than as a dedicated context field. The value
+// is a depth in feet on the same 0–60 scale the columns draw, so it is used as
+// reported — see the firmware's computeCurrentWaterLevelFeet.
 function readCurrentWaterLevel(readings: DeviceReading[]): number | null {
   const value = readings.find((r) => r.id === "current_water_level")?.value;
   if (value === undefined) return null;
@@ -123,15 +125,28 @@ function columnKey(columnNumber: number, control: string): string {
   return `column-${columnNumber}-${control}`;
 }
 
+/** Days rolled into a year, ignoring leap years — see `formatRuntime`. */
+const DAYS_PER_YEAR = 365;
+
 // Minute-resolution elapsed-time label, e.g. "0d 0h 5m", "2d 4h 23m". All three
 // units are always spelled out, empty or not, so a counter keeps the same shape
 // as it grows and the figures line up down a column. Sub-minute runtime reads
 // as "0d 0h 0m" — seconds are deliberately not shown.
+//
+// A pump left in service for years would otherwise reach "731d 4h 23m", a figure
+// nobody reads as two years without doing the division. Past a year the label
+// rolls the days up and drops the minutes instead of adding a fourth unit —
+// "2y 1d 4h" — because a counter that far along is read for its years, and the
+// minute on a figure of that size is noise the column width can't afford.
 function formatRuntime(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
   const days = Math.floor(s / 86400);
   const hours = Math.floor((s % 86400) / 3600);
   const minutes = Math.floor((s % 3600) / 60);
+  if (days >= DAYS_PER_YEAR) {
+    const years = Math.floor(days / DAYS_PER_YEAR);
+    return `${years}y ${days % DAYS_PER_YEAR}d ${hours}h`;
+  }
   return `${days}d ${hours}h ${minutes}m`;
 }
 

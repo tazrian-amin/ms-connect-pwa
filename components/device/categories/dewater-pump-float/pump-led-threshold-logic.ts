@@ -1,39 +1,40 @@
-import { WATER_LED_SEGMENT_COUNT } from "./constants";
+import { clampFeet } from "./threshold-track-math";
 
-function clampPercent(value: number) {
-  return Math.min(100, Math.max(0, value));
+/**
+ * Segment holding a given depth. One segment is one foot, so the two are the
+ * same number — the conversion exists to name which of the two a value is.
+ * Segment index 0 is the bottom foot of the column.
+ */
+function feetToSegmentIndex(feet: number): number {
+  return Math.round(clampFeet(feet));
 }
 
 /** Segment index where the dead band starts (bottom of grey zone). */
 export function getLowThresholdBoundaryIndex(triggerLevelLow: number) {
-  const low = clampPercent(triggerLevelLow);
-  return Math.round((low / 100) * WATER_LED_SEGMENT_COUNT);
+  return feetToSegmentIndex(triggerLevelLow);
 }
 
 /** First segment index above the dead band (bottom of lit green zone). */
 export function getHighThresholdBoundaryIndex(triggerLevelHigh: number) {
-  const high = clampPercent(triggerLevelHigh);
-  return Math.round((high / 100) * WATER_LED_SEGMENT_COUNT);
+  return feetToSegmentIndex(triggerLevelHigh);
 }
 
-/** Topmost lit segment index for a 0–100 water level (bottom-up fill). */
+/** Topmost lit segment index for a water depth in feet (bottom-up fill). */
 export function waterLevelToTopSegmentIndex(waterLevel: number) {
-  const clamped = clampPercent(waterLevel);
-  if (clamped === 0) return -1;
-  return Math.round((clamped / 100) * WATER_LED_SEGMENT_COUNT) - 1;
+  return feetToSegmentIndex(waterLevel) - 1;
 }
 
 /**
  * Stateless preview of the firmware's pump control for disconnected/demo
  * mode: on once the water level has risen above the HIGH trigger point.
- * Both are plain water-level percentages, so no remapping is involved.
+ * Both are plain water depths in feet, so no remapping is involved.
  * Unlike the firmware's hysteresis — which also needs the LOW trigger to
  * decide when to turn back off — this has no memory of a prior state to hold
  * onto, so LOW plays no part here. A water level at or below the HIGH trigger
- * (e.g. an empty/0% reading) always reads as OFF.
+ * (e.g. an empty/0 ft reading) always reads as OFF.
  */
 export function isPumpOn(waterLevel: number, triggerLevelHigh: number): boolean {
-  return clampPercent(waterLevel) > clampPercent(triggerLevelHigh);
+  return clampFeet(waterLevel) > clampFeet(triggerLevelHigh);
 }
 
 export type PumpLedSegmentState = "red" | "green" | "off";
@@ -44,7 +45,9 @@ export type PumpLedSegmentState = "red" | "green" | "off";
  *
  * Both thresholds roam the whole column, so the colour bands follow them
  * rather than fixed halves: below LOW is red, above HIGH is green, and the
- * dead band between the two is off. Thresholds that meet leave no dead band.
+ * dead band between the two is off. That band is never empty — the sliders
+ * hold the pair a foot apart — so a pump column always shows at least the one
+ * unlit segment its hysteresis runs in.
  */
 export function getPumpLedSegmentState(
   segmentIndex: number,

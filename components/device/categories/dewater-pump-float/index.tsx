@@ -14,6 +14,7 @@ import type { ProvisionProgress } from "@/context/bluetooth-provider";
 import type { CategoryDetailsProps } from "@/components/device/categories";
 import {
   PumpMonitoringPalette,
+  WATER_LEVEL_MAX_FEET,
   WATER_TRIGGER_LEVEL_HIGH_DEFAULT,
   WATER_TRIGGER_LEVEL_LOW_DEFAULT,
 } from "./constants";
@@ -85,10 +86,10 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
       <TelemetryChart
         samples={samples}
         title="Water Level Telemetry"
-        seriesLabel="Water Level (%)"
+        seriesLabel="Water Level (ft)"
         seriesColor={PumpMonitoringPalette.waterActive}
-        unit="%"
-        yDomain={[0, 100]}
+        unit=" ft"
+        yDomain={[0, WATER_LEVEL_MAX_FEET]}
         emptyMessage="Waiting for water level readings from the device..."
         showAverage={false}
         referenceLines={[
@@ -104,8 +105,8 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
           },
         ]}
       />
-      <SamplePeriodControl />
-      <CommandConsole categoryId="dewater-pump-float" />
+      {/* <SamplePeriodControl />
+      <CommandConsole categoryId="dewater-pump-float" /> */}
       <DeviceSetupDialog
         open={needsSetup}
         onSubmit={provisionDevice}

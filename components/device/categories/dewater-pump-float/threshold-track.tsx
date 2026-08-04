@@ -13,10 +13,17 @@ import {
   LED_COLUMN_WIDTH,
   PumpMonitoringPalette,
   THRESHOLD_MARKER_HEIGHT,
+  THRESHOLD_MARKER_WIDTH,
+  THRESHOLD_MIN_SEPARATION_FEET,
+  THRESHOLD_POINTER_ARROW_HEIGHT,
+  THRESHOLD_POINTER_ARROW_WIDTH,
   THRESHOLD_POINTER_HEIGHT,
+  THRESHOLD_POINTER_LEFT,
   THRESHOLD_POINTER_WIDTH,
+  WATER_LEVEL_MAX_FEET,
 } from "./constants";
 import {
+  clampFeet,
   resolveThresholdLayout,
   trackOffsetToLevel,
   type ThresholdPointerLayout,
@@ -40,9 +47,9 @@ interface ThresholdTrackProps {
   name: string;
   /** Overrides the HIGH/LOW pill text (and the accessible names with it). */
   pointerText?: ThresholdPointerText;
-  /** 0–100 over the full column; never drops below `low`. */
+  /** Feet over the full column; stays a foot above `low`. */
   triggerLevelHigh: number;
-  /** 0–100 over the full column; never rises above `high`. */
+  /** Feet over the full column; stays a foot below `high`. */
   triggerLevelLow: number;
   onTriggerLevelHighChange: (value: number) => void;
   onTriggerLevelLowChange: (value: number) => void;
@@ -56,9 +63,10 @@ interface DragState {
 }
 
 /**
- * Whichever pointer is nearer the press wins. When they sit together, the
- * direction of the press decides — so a stacked pair can still be pulled
- * apart (press above the meeting point to take HIGH, below it to take LOW).
+ * Whichever pointer is nearer the press wins. A press equidistant from both —
+ * which a pair only a foot or two apart makes easy to land — is decided by its
+ * direction, so the closer of the two can still be taken deliberately (press
+ * above the midpoint for HIGH, below it for LOW).
  */
 function pointerUnderPress(
   level: number,
@@ -97,6 +105,9 @@ function ThresholdPointer({
       aria-valuemin={valueMin}
       aria-valuemax={valueMax}
       aria-valuenow={value}
+      // Every level on the dashboard is a depth, so the reading is spoken with
+      // its unit rather than as a bare number.
+      aria-valuetext={`${value} feet`}
       aria-disabled={disabled || undefined}
       sx={{ pointerEvents: "none" }}
     >
@@ -105,7 +116,7 @@ function ThresholdPointer({
           position: "absolute",
           top: layout.markerTop,
           left: 0,
-          width: LED_COLUMN_WIDTH,
+          width: THRESHOLD_MARKER_WIDTH,
           height: THRESHOLD_MARKER_HEIGHT,
           borderRadius: "1px",
           bgcolor: PumpMonitoringPalette.thresholdPointerBorder,
@@ -115,7 +126,7 @@ function ThresholdPointer({
         sx={{
           position: "absolute",
           top: layout.pillTop,
-          left: (LED_COLUMN_WIDTH - THRESHOLD_POINTER_WIDTH) / 2,
+          left: THRESHOLD_POINTER_LEFT,
           width: THRESHOLD_POINTER_WIDTH,
           height: THRESHOLD_POINTER_HEIGHT,
           borderRadius: "5px",
@@ -124,6 +135,10 @@ function ThresholdPointer({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          gap: "4px",
+          // Label and reading stay on one line whatever the reading is; the
+          // pill is fixed-width and a wrap would break its shape.
+          whiteSpace: "nowrap",
           boxShadow: "0 1px 3px rgba(15, 23, 42, 0.2)",
         }}
       >
@@ -137,7 +152,38 @@ function ThresholdPointer({
         >
           {text}
         </Typography>
+        {/* The reading itself, so a drag states where it is as it goes rather
+            than only where it landed. Tracks the drag, not the device: this is
+            the value that would be sent if the pointer were released here.
+            Bracketed off the label, which names what the pill is rather than
+            what it currently reads. */}
+        <Typography
+          sx={{
+            fontSize: 10,
+            fontWeight: 700,
+            fontVariantNumeric: "tabular-nums",
+            color: PumpMonitoringPalette.thresholdPointerGrip,
+          }}
+        >
+          ({value})
+        </Typography>
       </Box>
+      {/* Aimed at the tick line: the pill says the depth, the arrow says where
+          on the scale it falls. */}
+      <Box
+        sx={{
+          position: "absolute",
+          top:
+            layout.pillTop +
+            (THRESHOLD_POINTER_HEIGHT - THRESHOLD_POINTER_ARROW_HEIGHT) / 2,
+          left: THRESHOLD_POINTER_LEFT + THRESHOLD_POINTER_WIDTH,
+          width: 0,
+          height: 0,
+          borderTop: `${THRESHOLD_POINTER_ARROW_HEIGHT / 2}px solid transparent`,
+          borderBottom: `${THRESHOLD_POINTER_ARROW_HEIGHT / 2}px solid transparent`,
+          borderLeft: `${THRESHOLD_POINTER_ARROW_WIDTH}px solid ${PumpMonitoringPalette.thresholdPointerBorder}`,
+        }}
+      />
     </Box>
   );
 }
@@ -161,12 +207,17 @@ export function ThresholdTrack({
 }: ThresholdTrackProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
 
-  // HIGH cannot be dragged below LOW, and LOW cannot be dragged above HIGH.
+  // The pair is held a foot apart rather than merely uncrossed: two thresholds
+  // at the same depth leave no dead band at all, so the pump they control would
+  // start and stop at the same reading and chatter around it. HIGH stops a foot
+  // above LOW on the way down, LOW a foot below HIGH on the way up.
   const clampToSibling = useCallback(
     (label: ThresholdPointerLabel, level: number) =>
-      label === "HIGH"
-        ? Math.max(level, triggerLevelLow)
-        : Math.min(level, triggerLevelHigh),
+      clampFeet(
+        label === "HIGH"
+          ? Math.max(level, triggerLevelLow + THRESHOLD_MIN_SEPARATION_FEET)
+          : Math.min(level, triggerLevelHigh - THRESHOLD_MIN_SEPARATION_FEET),
+      ),
     [triggerLevelHigh, triggerLevelLow],
   );
 
@@ -237,7 +288,7 @@ export function ThresholdTrack({
         layout={layout.low}
         value={lowLevel}
         valueMin={0}
-        valueMax={highLevel}
+        valueMax={highLevel - THRESHOLD_MIN_SEPARATION_FEET}
         disabled={disabled}
       />
       <ThresholdPointer
@@ -245,8 +296,8 @@ export function ThresholdTrack({
         text={pointerText.high}
         layout={layout.high}
         value={highLevel}
-        valueMin={lowLevel}
-        valueMax={100}
+        valueMin={lowLevel + THRESHOLD_MIN_SEPARATION_FEET}
+        valueMax={WATER_LEVEL_MAX_FEET}
         disabled={disabled}
       />
     </Box>
