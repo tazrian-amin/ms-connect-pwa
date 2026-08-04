@@ -10,6 +10,7 @@ import Typography from "@mui/material/Typography";
 
 import type { DeviceReading, PumpRuntime } from "@/types/bluetooth";
 import { useBluetooth } from "@/context/bluetooth-provider";
+import { useToast } from "@/context/toast-provider";
 import { retrofitFloatCommands } from "@/lib/bluetooth/commands";
 import {
   COLUMN_GAP,
@@ -32,6 +33,7 @@ import {
 import { MinOffTimeSection } from "./min-off-time-section";
 import { isPumpOn } from "./pump-led-threshold-logic";
 import { PumpColumn } from "./pump-column";
+import { PumpCounterRows } from "./pump-counter-rows";
 import { PumpHeaderRows, type PumpColumnView } from "./pump-header-rows";
 import { derivePumpRunState } from "./pump-run-state";
 import { ResetCounterDialog } from "./reset-counter-dialog";
@@ -42,6 +44,7 @@ import type {
   SessionCounter,
 } from "./types";
 import { useDeviceCommand } from "./use-device-command";
+import { useLastReset } from "./use-last-reset";
 import { WaterLevelColumn } from "./water-level-column";
 
 interface PumpMonitoringDashboardProps {
@@ -167,9 +170,20 @@ export function PumpMonitoringDashboard({
   onWaterTriggerLevelHighChange,
   onWaterTriggerLevelLowChange,
 }: PumpMonitoringDashboardProps) {
-  const { status, sendCommand, readings, pumpRuntimes, resetPumpRuntime } =
-    useBluetooth();
+  const {
+    status,
+    sendCommand,
+    readings,
+    pumpRuntimes,
+    resetPumpRuntime,
+    deviceSerialNumber,
+  } = useBluetooth();
+  const { showToast } = useToast();
   const isConnected = status === "connected";
+
+  // Filed against the controller's own serial, so switching stations doesn't
+  // carry one's reset dates over to the next. Null until it reports one.
+  const { lastReset, markReset } = useLastReset(deviceSerialNumber || null);
 
   // Every control on the dashboard writes straight to the device, so the
   // dashboard opens read-only and the user has to opt in before anything can
@@ -301,88 +315,116 @@ export function PumpMonitoringDashboard({
   );
 
   // Disconnected stand-ins for the two device resets. Each clears its own
-  // counter, exactly as the commands below do — the demo state is the only
-  // thing the dashboard reads while there is no device to own the figures.
-  const resetDemoRuntime = useCallback((pumpId: number) => {
+  // counter on every pump, exactly as the fan-out below does — the demo state
+  // is the only thing the dashboard reads while there is no device to own the
+  // figures.
+  const resetDemoRuntime = useCallback(() => {
     setData((prev) => ({
       ...prev,
-      pumps: prev.pumps.map((p) =>
-        p.id === pumpId ? { ...p, runtimeHours: 0 } : p,
-      ),
+      pumps: prev.pumps.map((p) => ({ ...p, runtimeHours: 0 })),
     }));
   }, []);
 
-  const resetDemoStarts = useCallback((pumpId: number) => {
+  const resetDemoStarts = useCallback(() => {
     setData((prev) => ({
       ...prev,
-      pumps: prev.pumps.map((p) =>
-        p.id === pumpId ? { ...p, currentStarts: 0 } : p,
-      ),
+      pumps: prev.pumps.map((p) => ({ ...p, currentStarts: 0 })),
     }));
   }, []);
 
   // Reset is destructive and has no undo, so a Reset button only opens the
-  // confirmation. Which pump, and which of its two session counters — they are
-  // separate figures with a command each, so a card's button clears its own
-  // and leaves the other running.
-  const [pendingReset, setPendingReset] = useState<{
-    pumpId: number;
-    counter: SessionCounter;
-  } | null>(null);
-  const requestResetRuntime = useCallback(
-    (pumpId: number) => setPendingReset({ pumpId, counter: "runtime" }),
-    [],
-  );
-  const requestResetStarts = useCallback(
-    (pumpId: number) => setPendingReset({ pumpId, counter: "starts" }),
-    [],
-  );
+  // confirmation. Which of the two session counters is the whole question: they
+  // are separate figures with a command each, so a button clears its own on
+  // every pump and leaves the other running on every pump.
+  const [pendingReset, setPendingReset] = useState<SessionCounter | null>(null);
+  const requestResetRuntime = useCallback(() => setPendingReset("runtime"), []);
+  const requestResetStarts = useCallback(() => setPendingReset("starts"), []);
   const cancelReset = useCallback(() => setPendingReset(null), []);
+
+  // Held across the whole fan-out rather than read off useDeviceCommand, whose
+  // pending keys clear between the six commands — this is one reset as far as
+  // the dialog and the buttons are concerned.
+  const [resetInFlight, setResetInFlight] = useState<SessionCounter | null>(
+    null,
+  );
 
   // The device owns the counter and answers with it, so the reply is what
   // zeroes the readout. Runtime alone has a local accumulator in the provider,
   // and it has to be cleared alongside, or it would keep counting from before
   // the reset; the start count is only ever the device's own report.
+  //
+  // The firmware has no reset-every-pump command, so one button is one command
+  // per pump. They go one at a time: the link is a single serial bridge, and
+  // each reply has to be matched to the command that asked for it. Failures are
+  // collected and reported once — six timeouts in a row would otherwise queue
+  // six toasts saying the same thing.
   const confirmReset = useCallback(async () => {
     if (pendingReset === null) return;
-    const { pumpId, counter } = pendingReset;
+    const counter = pendingReset;
 
     if (!isConnected) {
-      if (counter === "runtime") resetDemoRuntime(pumpId);
-      else resetDemoStarts(pumpId);
+      if (counter === "runtime") resetDemoRuntime();
+      else resetDemoStarts();
       setPendingReset(null);
       return;
     }
 
-    if (counter === "runtime") {
-      const reply = await run({
-        key: pumpKey(pumpId, "reset-runtime"),
-        command: retrofitFloatCommands.resetPumpRuntime(pumpId),
-        // Confirmed on the command's own echo, not on the counter it zeroes:
-        // the counter also rides every periodic report, so one arriving mid-flight
-        // would read as an acknowledgement the device never sent.
-        confirms: `pump_${pumpId}_reset_runtime`,
-        action: `reset the session runtime for pump ${pumpId}`,
-      });
-      if (reply !== null) {
-        resetPumpRuntime(pumpId);
+    setResetInFlight(counter);
+    const failed: number[] = [];
+    try {
+      for (const pump of pumps) {
+        const reply = await run(
+          counter === "runtime"
+            ? {
+                key: pumpKey(pump.id, "reset-runtime"),
+                command: retrofitFloatCommands.resetPumpRuntime(pump.id),
+                // Confirmed on the command's own echo, not on the counter it
+                // zeroes: the counter also rides every periodic report, so one
+                // arriving mid-flight would read as an acknowledgement the
+                // device never sent.
+                confirms: `pump_${pump.id}_reset_runtime`,
+                action: `reset the session runtime for pump ${pump.id}`,
+                silent: true,
+              }
+            : {
+                key: pumpKey(pump.id, "reset-starts"),
+                command: retrofitFloatCommands.resetPumpStarts(pump.id),
+                confirms: `pump_${pump.id}_reset_starts`,
+                action: `reset the session starts for pump ${pump.id}`,
+                silent: true,
+              },
+        );
+
+        if (reply === null) failed.push(pump.id);
+        else if (counter === "runtime") resetPumpRuntime(pump.id);
       }
-    } else {
-      await run({
-        key: pumpKey(pumpId, "reset-starts"),
-        command: retrofitFloatCommands.resetPumpStarts(pumpId),
-        confirms: `pump_${pumpId}_reset_starts`,
-        action: `reset the session starts for pump ${pumpId}`,
-      });
+    } finally {
+      setResetInFlight(null);
+    }
+
+    // Recorded on any pump taking it: the counters above the button have moved,
+    // so the date they are read against has to move with them. All six failing
+    // means nothing was cleared, and the old date still stands.
+    if (failed.length < pumps.length) markReset(counter);
+
+    if (failed.length > 0) {
+      showToast(
+        `Could not reset the session ${counter} for pump${
+          failed.length > 1 ? "s" : ""
+        } ${failed.join(", ")}.`,
+      );
     }
     setPendingReset(null);
   }, [
     isConnected,
+    markReset,
     pendingReset,
+    pumps,
     resetDemoRuntime,
     resetDemoStarts,
     resetPumpRuntime,
     run,
+    showToast,
   ]);
 
   // The firmware owns the consequence: it stops the pump on disable and keeps
@@ -605,18 +647,6 @@ export function PumpMonitoringDashboard({
     };
   });
 
-  const pendingResetPump =
-    pendingReset === null
-      ? undefined
-      : pumps.find((p) => p.id === pendingReset.pumpId);
-
-  // The figure the confirmation quotes back: whichever counter is being cleared.
-  const pendingResetValueLabel = !pendingResetPump
-    ? ""
-    : pendingReset?.counter === "starts"
-      ? counterLabelsFor(pendingResetPump).currentStarts
-      : counterLabelsFor(pendingResetPump).currentRuntime;
-
   return (
     <Box>
       <Box
@@ -726,48 +756,47 @@ export function PumpMonitoringDashboard({
               />
             </Box>
 
-            {columnViews.map(({ column, pump }) => {
-              const labels = counterLabelsFor(pump);
+            {columnViews.map(({ column, pump }) => (
+              <Box
+                key={column.number}
+                sx={{ alignSelf: "start", width: "100%", pt: 1 }}
+              >
+                <PumpColumn
+                  column={column}
+                  pump={pump}
+                  onTriggerLevelHighChange={setTriggerLevelHigh}
+                  onTriggerLevelLowChange={setTriggerLevelLow}
+                  locked={!editsUnlocked}
+                  thresholdPending={isPending(
+                    columnKey(column.number, "threshold"),
+                  )}
+                />
+              </Box>
+            ))}
 
-              return (
-                <Box
-                  key={column.number}
-                  sx={{ alignSelf: "start", width: "100%", pt: 1 }}
-                >
-                  <PumpColumn
-                    column={column}
-                    pump={pump}
-                    totalRuntimeLabel={labels.totalRuntime}
-                    currentRuntimeLabel={labels.currentRuntime}
-                    totalStartsLabel={labels.totalStarts}
-                    currentStartsLabel={labels.currentStarts}
-                    onResetRuntime={requestResetRuntime}
-                    onResetStarts={requestResetStarts}
-                    onTriggerLevelHighChange={setTriggerLevelHigh}
-                    onTriggerLevelLowChange={setTriggerLevelLow}
-                    locked={!editsUnlocked}
-                    thresholdPending={isPending(
-                      columnKey(column.number, "threshold"),
-                    )}
-                  />
-                </Box>
-              );
-            })}
+            {/* The counter rows follow the gauges as their own grid rows, not
+                as part of each column, so the reset under each row can stretch
+                across all six pumps — one button, one counter, every pump. */}
+            <PumpCounterRows
+              views={columnViews}
+              labelsFor={counterLabelsFor}
+              onResetRuntime={requestResetRuntime}
+              onResetStarts={requestResetStarts}
+              locked={!editsUnlocked}
+              resetInFlight={resetInFlight}
+              lastReset={lastReset}
+            />
           </Box>
         </Box>
       </Box>
 
       <ResetCounterDialog
-        open={pendingResetPump !== undefined}
-        pumpId={pendingResetPump?.id ?? null}
-        counter={pendingReset?.counter ?? "runtime"}
-        valueLabel={pendingResetValueLabel}
+        open={pendingReset !== null}
+        counter={pendingReset ?? "runtime"}
+        pumpCount={pumps.length}
         onConfirm={confirmReset}
         onCancel={cancelReset}
-        pending={
-          pendingReset !== null &&
-          isPending(pumpKey(pendingReset.pumpId, `reset-${pendingReset.counter}`))
-        }
+        pending={resetInFlight !== null}
       />
     </Box>
   );

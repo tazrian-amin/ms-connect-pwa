@@ -21,6 +21,13 @@ export interface DeviceCommandRequest {
   confirms: string;
   /** Completes "Could not …" in the failure message, e.g. "disable pump 3". */
   action: string;
+  /**
+   * Suppresses that message, for a caller that sends the same command to every
+   * pump and would otherwise raise six toasts as a dropped link times each one
+   * out in turn. Such a caller reports the failures itself, as one — a null
+   * return says the command didn't land, which is all it needs to know.
+   */
+  silent?: boolean;
 }
 
 /**
@@ -45,6 +52,7 @@ export function useDeviceCommand() {
       command,
       confirms,
       action,
+      silent = false,
     }: DeviceCommandRequest): Promise<Record<string, unknown> | null> => {
       setPendingKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
       try {
@@ -57,13 +65,15 @@ export function useDeviceCommand() {
         );
 
         if (reply === null) {
-          showToast(`Could not ${action} — the device did not respond.`);
+          if (!silent) {
+            showToast(`Could not ${action} — the device did not respond.`);
+          }
           return null;
         }
         if (reply.status === "error") {
           const detail =
             typeof reply.msg === "string" ? reply.msg : "the device rejected it";
-          showToast(`Could not ${action} — ${detail}.`);
+          if (!silent) showToast(`Could not ${action} — ${detail}.`);
           return null;
         }
         return reply;

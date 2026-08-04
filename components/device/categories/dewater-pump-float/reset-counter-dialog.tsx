@@ -11,30 +11,27 @@ import type { SessionCounter } from "./types";
 
 interface ResetCounterDialogProps {
   open: boolean;
-  /** Null while closed; drives the pump named in the prompt. */
-  pumpId: number | null;
-  /** Which of the pump's two session counters is being cleared. */
+  /** Which of the two session counters is being cleared, on every pump. */
   counter: SessionCounter;
-  /**
-   * Preformatted value about to be cleared — "2d 4h 23m" for the runtime, "12"
-   * for the starts.
-   */
-  valueLabel: string;
+  /** How many pumps the reset reaches — named in the prompt. */
+  pumpCount: number;
   onConfirm: () => void;
   onCancel: () => void;
   /**
-   * The reset is with the device. It only counts once the device answers with
-   * the zeroed counter, so the dialog stays up — and shut — until then.
+   * The reset is with the device — one command per pump. It only counts once
+   * the device answers each, so the dialog stays up, and shut, until then.
    */
   pending?: boolean;
 }
 
-/** Guards a counter reset, which is destructive and has no undo. */
+/**
+ * Guards a counter reset, which is destructive, has no undo, and clears the
+ * counter on every pump at once.
+ */
 export function ResetCounterDialog({
   open,
-  pumpId,
   counter,
-  valueLabel,
+  pumpCount,
   onConfirm,
   onCancel,
   pending = false,
@@ -49,30 +46,29 @@ export function ResetCounterDialog({
       fullWidth
       onClose={pending ? undefined : onCancel}
     >
-      <DialogTitle>
-        Reset pump {pumpId} {counterName}?
-      </DialogTitle>
+      <DialogTitle>Reset {counterName} for all pumps?</DialogTitle>
       <DialogContent>
         {/* Each counter is cleared on its own, so only the one being reset is
-            named — the other session figure keeps running. */}
+            named — the other session figure keeps running on every pump. */}
         <Typography variant="body2" color="text.secondary">
-          This clears the {isRuntime ? "session runtime of" : "session start count of"}{" "}
+          This clears the{" "}
+          {isRuntime ? "session runtime" : "session start count"} of{" "}
           <Typography
             component="span"
             variant="body2"
             color="text.primary"
             sx={{ fontWeight: 600 }}
           >
-            {valueLabel}
+            all {pumpCount} pumps
           </Typography>{" "}
           back to zero, and can&apos;t be undone.
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
           The {isRuntime ? "total runtime" : "total starts"} since installation
-          is not affected, and neither is this pump&apos;s{" "}
+          is not affected, and neither is any pump&apos;s{" "}
           {isRuntime ? "session start count" : "session runtime"}. Note that
-          alteration ranks on the session counters, so this can also move this
-          pump to the front of the running order.
+          alteration ranks on the session counters, so clearing every pump&apos;s
+          at once leaves the device to rank them from scratch.
         </Typography>
       </DialogContent>
       <DialogActions>

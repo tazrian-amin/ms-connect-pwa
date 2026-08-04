@@ -22,6 +22,15 @@ export const PumpMonitoringPalette = {
   waterBadgeText: "#1d4ed8",
   resetButtonBg: "var(--panel-control-bg)",
   resetButtonText: "var(--panel-text)",
+  /**
+   * What a reset button turns on hover. Neutral at rest so it doesn't shout
+   * from a dashboard nobody is touching, and destructive-red under the pointer,
+   * where it is about to be pressed — the same red the confirmation's own Reset
+   * carries, so the two read as one action.
+   */
+  resetButtonHoverBg: "var(--panel-danger-bg)",
+  resetButtonHoverBorder: "var(--panel-danger-border)",
+  resetButtonHoverText: "var(--panel-danger-text)",
   /** Tint behind the "Enable Edits" toggle while edits are unlocked. */
   editUnlockedBg: "rgba(16, 185, 129, 0.14)",
   /** Informational notice pill. Nothing on the dashboard uses one today. */

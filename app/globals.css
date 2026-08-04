@@ -23,6 +23,12 @@
   --panel-notice-bg: rgba(59, 130, 246, 0.12);
   --panel-notice-border: rgba(59, 130, 246, 0.35);
   --panel-notice-text: #1d4ed8;
+  /* Destructive tint, same shape as the notice triplet: a control that undoes
+     something takes these on hover rather than a plain darken, so the warning
+     arrives before the press does. */
+  --panel-danger-bg: rgba(239, 68, 68, 0.12);
+  --panel-danger-border: rgba(239, 68, 68, 0.45);
+  --panel-danger-text: #b91c1c;
 }
 
 @theme inline {
@@ -53,6 +59,9 @@
     --panel-notice-bg: rgba(59, 130, 246, 0.18);
     --panel-notice-border: rgba(96, 165, 250, 0.45);
     --panel-notice-text: #93c5fd;
+    --panel-danger-bg: rgba(239, 68, 68, 0.18);
+    --panel-danger-border: rgba(248, 113, 113, 0.5);
+    --panel-danger-text: #fca5a5;
   }
 }
 
