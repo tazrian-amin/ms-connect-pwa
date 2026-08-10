@@ -7,8 +7,8 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { DeviceInfo } from "@/components/device/device-info";
 import { TelemetryChart } from "@/components/device/telemetry-chart";
-import { SamplePeriodControl } from "@/components/device/sample-period-control";
-import { CommandConsole } from "@/components/device/command-console";
+// import { SamplePeriodControl } from "@/components/device/sample-period-control";
+// import { CommandConsole } from "@/components/device/command-console";
 import { useBluetooth } from "@/context/bluetooth-provider";
 import type { ProvisionProgress } from "@/context/bluetooth-provider";
 import type { CategoryDetailsProps } from "@/components/device/categories";
@@ -52,8 +52,15 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
   // until get_config confirms the new values (see updateDeviceIdentity). Skips
   // the reboot entirely when nothing actually changed.
   const handleEditSave = useCallback(
-    (uid: string, sn: string, onProgress?: (stage: ProvisionProgress) => void) => {
-      if (uid === (deviceProductUid ?? "") && sn === (deviceSerialNumber ?? "")) {
+    (
+      uid: string,
+      sn: string,
+      onProgress?: (stage: ProvisionProgress) => void,
+    ) => {
+      if (
+        uid === (deviceProductUid ?? "") &&
+        sn === (deviceSerialNumber ?? "")
+      ) {
         return Promise.resolve({ ok: true as const });
       }
       return updateDeviceIdentity(uid, sn, onProgress);

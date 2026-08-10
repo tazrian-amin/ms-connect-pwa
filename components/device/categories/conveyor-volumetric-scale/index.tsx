@@ -5,17 +5,23 @@ import CardContent from "@mui/material/CardContent";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { DeviceInfo } from "@/components/device/device-info";
-import { TelemetryChart } from "@/components/device/telemetry-chart";
-import { SamplePeriodControl } from "@/components/device/sample-period-control";
-import { CommandConsole } from "@/components/device/command-console";
+// import { TelemetryChart } from "@/components/device/telemetry-chart";
+// import { SamplePeriodControl } from "@/components/device/sample-period-control";
+// import { CommandConsole } from "@/components/device/command-console";
+// import { VolumetricConfigPanel } from "./volumetric-config-panel";
 import { useBluetooth } from "@/context/bluetooth-provider";
 import type { CategoryDetailsProps } from "@/components/device/categories";
 import { ScaleMonitoringDashboard } from "./scale-monitoring-dashboard";
-import { VolumetricConfigPanel } from "./volumetric-config-panel";
 
-export function ConveyorVolumetricScaleDetails({ isConnected }: CategoryDetailsProps) {
-  const { connectedDevice, readings, adcSamples } = useBluetooth();
-  const samples = isConnected ? adcSamples : [];
+export function ConveyorVolumetricScaleDetails({
+  isConnected,
+}: CategoryDetailsProps) {
+  const {
+    connectedDevice,
+    readings,
+    // adcSamples
+  } = useBluetooth();
+  // const samples = isConnected ? adcSamples : [];
 
   return (
     <Stack spacing={2}>
@@ -30,10 +36,10 @@ export function ConveyorVolumetricScaleDetails({ isConnected }: CategoryDetailsP
           <ScaleMonitoringDashboard />
         </CardContent>
       </Card>
-      <VolumetricConfigPanel />
-      <TelemetryChart samples={samples} />
-      <SamplePeriodControl />
-      <CommandConsole categoryId="conveyor-volumetric-scale" />
+      {/* <VolumetricConfigPanel /> */}
+      {/* <TelemetryChart samples={samples} /> */}
+      {/* <SamplePeriodControl /> */}
+      {/* <CommandConsole categoryId="conveyor-volumetric-scale" /> */}
     </Stack>
   );
 }

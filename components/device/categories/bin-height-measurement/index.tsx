@@ -7,8 +7,8 @@ import Typography from "@mui/material/Typography";
 import { DeviceInfo } from "@/components/device/device-info";
 import { IndustrialBinHopper } from "@/components/device/categories/bin-height-measurement/industrial-bin-hopper";
 import { TelemetryChart } from "@/components/device/telemetry-chart";
-import { SamplePeriodControl } from "@/components/device/sample-period-control";
-import { CommandConsole } from "@/components/device/command-console";
+// import { SamplePeriodControl } from "@/components/device/sample-period-control";
+// import { CommandConsole } from "@/components/device/command-console";
 import { useBluetooth } from "@/context/bluetooth-provider";
 import type { CategoryDetailsProps } from "@/components/device/categories";
 
@@ -16,7 +16,9 @@ import type { CategoryDetailsProps } from "@/components/device/categories";
 // calibration exists yet, so load is reported in raw ADC counts.
 const MAX_ADC = 4095;
 
-export function BinHeightMeasurementDetails({ isConnected }: CategoryDetailsProps) {
+export function BinHeightMeasurementDetails({
+  isConnected,
+}: CategoryDetailsProps) {
   const { connectedDevice, readings, adcSamples } = useBluetooth();
   const samples = isConnected ? adcSamples : [];
 
@@ -42,14 +44,22 @@ export function BinHeightMeasurementDetails({ isConnected }: CategoryDetailsProp
             capacity={MAX_ADC}
             loadUnitLabel="ADC counts"
           />
-          <Typography variant="h5" sx={{ mt: 1, textAlign: "center", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+          <Typography
+            variant="h5"
+            sx={{
+              mt: 1,
+              textAlign: "center",
+              fontWeight: 600,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
             {latestAdc == null ? "—" : latestAdc}
           </Typography>
         </CardContent>
       </Card>
       <TelemetryChart samples={samples} />
-      <SamplePeriodControl />
-      <CommandConsole categoryId="bin-height-measurement" />
+      {/* <SamplePeriodControl />
+      <CommandConsole categoryId="bin-height-measurement" /> */}
     </Stack>
   );
 }

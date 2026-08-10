@@ -2,12 +2,14 @@
 
 import { DeviceInfo } from "@/components/device/device-info";
 import { TelemetryChart } from "@/components/device/telemetry-chart";
-import { SamplePeriodControl } from "@/components/device/sample-period-control";
-import { CommandConsole } from "@/components/device/command-console";
+// import { SamplePeriodControl } from "@/components/device/sample-period-control";
+// import { CommandConsole } from "@/components/device/command-console";
 import { useBluetooth } from "@/context/bluetooth-provider";
 import type { CategoryDetailsProps } from "@/components/device/categories";
 
-export function DewaterWaterLevelDetails({ isConnected }: CategoryDetailsProps) {
+export function DewaterWaterLevelDetails({
+  isConnected,
+}: CategoryDetailsProps) {
   const { connectedDevice, readings, adcSamples } = useBluetooth();
   const samples = isConnected ? adcSamples : [];
 
@@ -17,8 +19,8 @@ export function DewaterWaterLevelDetails({ isConnected }: CategoryDetailsProps) 
         <DeviceInfo device={connectedDevice} readings={readings} />
       )}
       <TelemetryChart samples={samples} />
-      <SamplePeriodControl />
-      <CommandConsole categoryId="dewater-water-level" />
+      {/* <SamplePeriodControl />
+      <CommandConsole categoryId="dewater-water-level" /> */}
     </div>
   );
 }
