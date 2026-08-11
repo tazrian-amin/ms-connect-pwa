@@ -40,6 +40,14 @@ export const PumpMonitoringPalette = {
   /** Start-count badge on each pump column. */
   startsBadgeBg: "var(--panel-bg)",
   startsBadgeText: "var(--panel-text-muted)",
+  /**
+   * Motor current column. Violet rather than the water column's blue: the two
+   * gauges stand side by side reading different quantities, and colour is what
+   * keeps a glance from taking one for the other.
+   */
+  currentActive: "#8b5cf6",
+  currentActiveGlow: "rgba(139, 92, 246, 0.45)",
+  currentBadgeText: "#6d28d9",
   thresholdPointer: "#64748b",
   thresholdPointerBorder: "#475569",
   thresholdPointerGrip: "#f1f5f9",
@@ -57,21 +65,95 @@ export const PUMP_COUNT = 6;
  */
 export const WATER_LEVEL_MAX_FEET = 60;
 
-/** One LED segment is one foot, which is what makes the columns readable. */
-export const LED_SEGMENT_COUNT = WATER_LEVEL_MAX_FEET;
+/**
+ * Full travel of the motor current column, in amps RMS. Same arrangement as
+ * the water level: the device reports and stores amps over 0–this, so nothing
+ * is converted between here and the wire.
+ */
+export const MOTOR_CURRENT_MAX_AMPS = 1000;
+
+/**
+ * What one LED — and one press of a threshold — is worth on the current
+ * column. A motor's current is read for its trend and its trip points, not to
+ * the amp, and a column with 1000 segments would be unreadable besides.
+ */
+export const MOTOR_CURRENT_STEP_AMPS = 20;
+
+/**
+ * What a gauge column measures: the range it spans, what one segment of it is
+ * worth, and how it names its readings.
+ *
+ * The columns share their whole geometry — the LED shell, the threshold
+ * sliders, the scale beside them — and differ only in this, which is why it is
+ * one value passed down rather than a fork at every level.
+ */
+export interface GaugeScale {
+  /** Top of the range; the bottom is always 0. */
+  max: number;
+  /** One LED, and the smallest change a threshold can be moved by. */
+  step: number;
+  /** Unit suffix on the readouts, e.g. "ft". */
+  unit: string;
+  /** Spoken unit, for the sliders' accessible values, e.g. "feet". */
+  unitLong: string;
+  /** Units between the scale's longer ticks. */
+  midStep: number;
+  /** Units between its labelled ticks. */
+  labelStep: number;
+}
+
+export const WATER_LEVEL_SCALE: GaugeScale = {
+  max: WATER_LEVEL_MAX_FEET,
+  step: 1,
+  unit: "ft",
+  unitLong: "feet",
+  midStep: 5,
+  labelStep: 10,
+};
+
+export const MOTOR_CURRENT_SCALE: GaugeScale = {
+  max: MOTOR_CURRENT_MAX_AMPS,
+  step: MOTOR_CURRENT_STEP_AMPS,
+  unit: "A",
+  unitLong: "amps",
+  midStep: 100,
+  labelStep: 200,
+};
+
+/** LEDs in a column on this scale — one per step. */
+export function gaugeSegmentCount(scale: GaugeScale): number {
+  return Math.round(scale.max / scale.step);
+}
 
 export const LED_COLUMN_WIDTH = 72;
 export const LED_COLUMN_PADDING = 8;
-export const LED_SEGMENT_HEIGHT = 6;
 export const LED_SEGMENT_GAP = 2;
 /** Inner track width inside the column padding. */
 export const LED_SEGMENT_WIDTH =
   LED_COLUMN_WIDTH - LED_COLUMN_PADDING * 2;
 
-/** Vertical span of the LED stack inside the column shell. */
+/** One LED segment on the water scale — the height every column is sized from. */
+export const LED_SEGMENT_HEIGHT = 6;
+
+/**
+ * Vertical span of the LED stack inside the column shell. Fixed for every
+ * column whatever it measures: they stand side by side in one grid row, and a
+ * column of a different height would break the row they are read across.
+ */
 export const LED_STACK_HEIGHT =
-  LED_SEGMENT_COUNT * LED_SEGMENT_HEIGHT +
-  (LED_SEGMENT_COUNT - 1) * LED_SEGMENT_GAP;
+  WATER_LEVEL_MAX_FEET * LED_SEGMENT_HEIGHT +
+  (WATER_LEVEL_MAX_FEET - 1) * LED_SEGMENT_GAP;
+
+/**
+ * A segment's height on a given scale — derived, because the stack height is
+ * the fixed quantity and the segment count follows the scale. Fewer, coarser
+ * steps make taller LEDs (the current column's 50 against the water column's
+ * 60), and every column still ends at the same line.
+ */
+export function gaugeSegmentHeight(scale: GaugeScale): number {
+  const count = gaugeSegmentCount(scale);
+  return (LED_STACK_HEIGHT - (count - 1) * LED_SEGMENT_GAP) / count;
+}
 
 /** Column height fits the full foot-per-segment stack plus vertical padding. */
 export const LED_COLUMN_HEIGHT = LED_STACK_HEIGHT + LED_COLUMN_PADDING * 2;
@@ -79,28 +161,47 @@ export const LED_COLUMN_HEIGHT = LED_STACK_HEIGHT + LED_COLUMN_PADDING * 2;
 export const LED_STACK_OFFSET_Y = LED_COLUMN_PADDING;
 
 /**
- * The foot scale drawn beside every gauge — see LevelScale. Ticks run down the
- * left of the gutter and their labels sit to the right of the long ones, so
- * the gutter has to hold the longest tick plus a two-digit label.
- */
-export const LEVEL_SCALE_WIDTH = 30;
-/**
- * Between a gauge and its scale. The threshold pointers cross it to reach the
- * ticks — see THRESHOLD_POINTER_LEFT — so it is sized for them rather than as
- * free space.
+ * Between a gauge and the scale beside it. The threshold pointers cross it to
+ * reach the ticks — see THRESHOLD_POINTER_LEFT — so it is sized for them
+ * rather than as free space.
  */
 export const LEVEL_SCALE_GAP = 8;
-/** Tick lengths: every foot, every fifth foot, and every labelled tenth. */
+/** Tick lengths: every step, every scale.midStep, and every labelled one. */
 export const LEVEL_SCALE_TICK_MINOR = 4;
 export const LEVEL_SCALE_TICK_MID = 7;
 export const LEVEL_SCALE_TICK_MAJOR = 10;
-/** Feet between long ticks, and between the labelled ones. */
-export const LEVEL_SCALE_MID_STEP = 5;
-export const LEVEL_SCALE_LABEL_STEP = 10;
+/** Between the longest tick and the label it carries. */
+export const LEVEL_SCALE_LABEL_GAP = 3;
+/** One tabular digit at the tick labels' 9px — see LevelScale. */
+export const LEVEL_SCALE_DIGIT_WIDTH = 6;
 
 /**
- * Both threshold sliders travel the whole LED stack — 0 ft = bottom segment,
- * 60 ft = top segment — so their values read as absolute water depths.
+ * Width of the scale drawn beside a gauge — see LevelScale. Ticks run down its
+ * left and their labels sit to the right of the long ones, so it has to hold
+ * the longest tick plus the widest label the scale prints, which is its own max.
+ *
+ * Derived per scale rather than fixed at the widest of them: the current
+ * column's scale prints "1000" and the water column's prints "60", and sizing
+ * both for four digits left every foot scale carrying two digits' worth of
+ * white space it had no use for.
+ */
+export function levelScaleWidth(scale: GaugeScale): number {
+  return (
+    LEVEL_SCALE_TICK_MAJOR +
+    LEVEL_SCALE_LABEL_GAP +
+    String(scale.max).length * LEVEL_SCALE_DIGIT_WIDTH
+  );
+}
+
+/**
+ * Gutter to the left of a gauge, holding the vertical title that names what it
+ * measures. Sized for that rotated line of text and nothing else.
+ */
+export const GAUGE_TITLE_WIDTH = 24;
+
+/**
+ * Both threshold sliders travel the whole LED stack — 0 = bottom segment, the
+ * scale's max = top segment — so their values read as absolute readings.
  */
 export const THRESHOLD_TRACK_TOP = LED_STACK_OFFSET_Y;
 export const THRESHOLD_TRACK_HEIGHT = LED_STACK_HEIGHT;
@@ -137,12 +238,15 @@ export const THRESHOLD_MARKER_WIDTH = LED_COLUMN_WIDTH + LEVEL_SCALE_GAP;
 export const THRESHOLD_POINTER_MIN_GAP = 2;
 
 /**
- * Feet a column's HIGH threshold is held above its LOW one. The two used to be
- * free to meet, which left the pump with no dead band at all — it would start
- * and stop at the same depth and chatter around it. One foot is the smallest
- * separation the scale can state, so it is the smallest the sliders allow.
+ * How far a column's HIGH threshold is held above its LOW one: one step of
+ * whatever it measures. The two used to be free to meet, which left the pump
+ * with no dead band at all — it would start and stop at the same reading and
+ * chatter around it. One step is the smallest separation a scale can state, so
+ * it is the smallest its sliders allow.
  */
-export const THRESHOLD_MIN_SEPARATION_FEET = 1;
+export function thresholdMinSeparation(scale: GaugeScale): number {
+  return scale.step;
+}
 
 /**
  * Water column's own trigger band, in feet. Where the dashboard starts before
@@ -150,6 +254,14 @@ export const THRESHOLD_MIN_SEPARATION_FEET = 1;
  */
 export const WATER_TRIGGER_LEVEL_HIGH_DEFAULT = 45;
 export const WATER_TRIGGER_LEVEL_LOW_DEFAULT = 15;
+
+/**
+ * Motor current column's alarm band, in amps. Same footing as the water band —
+ * the device owns and reports both — and these match the firmware's own
+ * defaults (kDefaultCurrentHighThr/kDefaultCurrentLowThr).
+ */
+export const MOTOR_CURRENT_HIGH_DEFAULT = 800;
+export const MOTOR_CURRENT_LOW_DEFAULT = 200;
 
 /**
  * Minutes a pump must stay off before it may restart. Held in the UI only —
@@ -161,32 +273,70 @@ export const PUMP_MIN_OFF_TIME_DEFAULT = 0;
 export const COLUMN_GAP = 20;
 
 /**
- * Width of one pump's grid column. Fixed rather than content-sized: the three
- * header rows and the gauge body are separate grid rows, and they only read as
- * one column each if every row tracks the same width.
+ * A track of air between the two reading columns and the six pump columns.
+ * They do two different jobs — the pair reports what the station is doing, the
+ * six set what it does — and at the ordinary column gap all eight read as one
+ * undifferentiated row.
  *
- * A scale's width is counted twice — once for the scale itself, once for the
- * blank gutter mirroring it on the other side of the gauge. That gutter is
- * what keeps the LEDs on the column's centre line, under the switch, number
- * and status pill above them, instead of the scale shoving them left.
+ * Held as a track rather than a wider gap because grid gaps are all or
+ * nothing, and it has to beat the space the water column's own title already
+ * opens beside the current column: that space is mostly white (a thin rotated
+ * line in a 24px gutter), so the eye would otherwise take *it* for the break —
+ * the one place in the row where there isn't one. This lands the pumps about
+ * twice that far off, with COLUMN_GAP either side of it.
  */
-export const PUMP_COLUMN_WIDTH =
-  LED_COLUMN_WIDTH + 2 * (LEVEL_SCALE_WIDTH + LEVEL_SCALE_GAP);
+export const PUMP_GROUP_GAP = 48;
+
+/**
+ * Width of a titled gauge's grid track: the title gutter, the gauge itself,
+ * and the scale beside it. Only the two reading columns carry a title — the
+ * pump columns are sized by PUMP_COLUMN_WIDTH instead.
+ */
+export function gaugeColumnWidth(scale: GaugeScale): number {
+  return (
+    GAUGE_TITLE_WIDTH +
+    LEVEL_SCALE_GAP +
+    LED_COLUMN_WIDTH +
+    LEVEL_SCALE_GAP +
+    levelScaleWidth(scale)
+  );
+}
+
+/** The motor current column's track — the grid's first. */
+export const CURRENT_COLUMN_WIDTH = gaugeColumnWidth(MOTOR_CURRENT_SCALE);
+
+/**
+ * Width of one pump's grid column. Fixed rather than content-sized: the header
+ * rows, the gauge body and the counter rows are separate grid rows, and they
+ * only read as one column each if every row tracks the same width.
+ *
+ * Sized by the two widest things standing in it — the gauge with its scale
+ * (105), and a runtime figure like "128d 7h 42m" on the counter rows below it
+ * — with a little to spare. There is no third claim on the width: the scale
+ * used to be counted twice, once for itself and once for a blank gutter
+ * mirroring it, and that gutter is gone. See PUMP_COLUMN_SCALE_INSET for what
+ * kept the LEDs centred in its place.
+ */
+export const PUMP_COLUMN_WIDTH = 108;
+
+/**
+ * How far a pump column's own furniture sits left of its track's centre line —
+ * or rather, the width it gives up on the right to get there.
+ *
+ * The gauge stands at the left of the track with its scale to the right, so
+ * the LEDs are not on the track's centre line. Everything that has to read as
+ * belonging to them — the enable switch, the pump number, the status pill,
+ * every counter figure below — is centred in the track less this, which puts
+ * it on the LEDs' centre line whatever the track's width.
+ */
+export const PUMP_COLUMN_SCALE_INSET =
+  LEVEL_SCALE_GAP + levelScaleWidth(WATER_LEVEL_SCALE);
 
 /**
  * Height of the pump status pill. Fixed so the row keeps its height whichever
  * status each pump is in.
  */
 export const STATUS_INDICATOR_HEIGHT = 42;
-
-/**
- * How wide that pill may grow. The grid column carries the gauge *and* the
- * scale beside it, so a pill filling the column would run twice the width of
- * the gauge it names. Capped at the gauge plus one scale gutter, it stays
- * centred on the LEDs and reads as belonging to them.
- */
-export const STATUS_INDICATOR_MAX_WIDTH =
-  LED_COLUMN_WIDTH + LEVEL_SCALE_WIDTH + LEVEL_SCALE_GAP;
 
 /** Height of the enable/disable switch row, same reason. */
 export const PUMP_TOGGLE_HEIGHT = 30;

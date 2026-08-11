@@ -14,17 +14,19 @@ import {
   PumpMonitoringPalette,
   THRESHOLD_MARKER_HEIGHT,
   THRESHOLD_MARKER_WIDTH,
-  THRESHOLD_MIN_SEPARATION_FEET,
   THRESHOLD_POINTER_ARROW_HEIGHT,
   THRESHOLD_POINTER_ARROW_WIDTH,
   THRESHOLD_POINTER_HEIGHT,
   THRESHOLD_POINTER_LEFT,
   THRESHOLD_POINTER_WIDTH,
-  WATER_LEVEL_MAX_FEET,
+  thresholdMinSeparation,
+  WATER_LEVEL_SCALE,
+  type GaugeScale,
 } from "./constants";
 import {
-  clampFeet,
+  clampToScale,
   resolveThresholdLayout,
+  snapToStep,
   trackOffsetToLevel,
   type ThresholdPointerLayout,
 } from "./threshold-track-math";
@@ -45,11 +47,13 @@ const DEFAULT_POINTER_TEXT: ThresholdPointerText = { high: "HIGH", low: "LOW" };
 interface ThresholdTrackProps {
   /** Subject of the sliders, e.g. "Pump" — used for the accessible names. */
   name: string;
+  /** What the column measures. Defaults to the water/feet scale. */
+  scale?: GaugeScale;
   /** Overrides the HIGH/LOW pill text (and the accessible names with it). */
   pointerText?: ThresholdPointerText;
-  /** Feet over the full column; stays a foot above `low`. */
+  /** Over the full column; stays one step above `low`. */
   triggerLevelHigh: number;
-  /** Feet over the full column; stays a foot below `high`. */
+  /** Over the full column; stays one step below `high`. */
   triggerLevelLow: number;
   onTriggerLevelHighChange: (value: number) => void;
   onTriggerLevelLowChange: (value: number) => void;
@@ -84,6 +88,7 @@ function pointerUnderPress(
 function ThresholdPointer({
   name,
   text,
+  scale,
   layout,
   value,
   valueMin,
@@ -92,6 +97,7 @@ function ThresholdPointer({
 }: {
   name: string;
   text: string;
+  scale: GaugeScale;
   layout: ThresholdPointerLayout;
   value: number;
   valueMin: number;
@@ -105,9 +111,9 @@ function ThresholdPointer({
       aria-valuemin={valueMin}
       aria-valuemax={valueMax}
       aria-valuenow={value}
-      // Every level on the dashboard is a depth, so the reading is spoken with
-      // its unit rather than as a bare number.
-      aria-valuetext={`${value} feet`}
+      // Every level on the dashboard is a measurement, so the reading is
+      // spoken with its unit rather than as a bare number.
+      aria-valuetext={`${value} ${scale.unitLong}`}
       aria-disabled={disabled || undefined}
       sx={{ pointerEvents: "none" }}
     >
@@ -198,6 +204,7 @@ function ThresholdPointer({
  */
 export function ThresholdTrack({
   name,
+  scale = WATER_LEVEL_SCALE,
   pointerText = DEFAULT_POINTER_TEXT,
   triggerLevelHigh,
   triggerLevelLow,
@@ -207,25 +214,36 @@ export function ThresholdTrack({
 }: ThresholdTrackProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
 
-  // The pair is held a foot apart rather than merely uncrossed: two thresholds
-  // at the same depth leave no dead band at all, so the pump they control would
-  // start and stop at the same reading and chatter around it. HIGH stops a foot
-  // above LOW on the way down, LOW a foot below HIGH on the way up.
+  // The pair is held a step apart rather than merely uncrossed: two thresholds
+  // at the same reading leave no dead band at all, so the pump they control
+  // would start and stop at the same reading and chatter around it. HIGH stops
+  // a step above LOW on the way down, LOW a step below HIGH on the way up.
+  //
+  // Snapped as well as clamped: the sibling it is held off may itself be a step
+  // out of phase (a band the device reports, or one set before the scale had
+  // this step), and a pointer that came to rest between two LEDs would read
+  // against no segment at all.
   const clampToSibling = useCallback(
-    (label: ThresholdPointerLabel, level: number) =>
-      clampFeet(
-        label === "HIGH"
-          ? Math.max(level, triggerLevelLow + THRESHOLD_MIN_SEPARATION_FEET)
-          : Math.min(level, triggerLevelHigh - THRESHOLD_MIN_SEPARATION_FEET),
-      ),
-    [triggerLevelHigh, triggerLevelLow],
+    (label: ThresholdPointerLabel, level: number) => {
+      const separation = thresholdMinSeparation(scale);
+      return snapToStep(
+        scale,
+        clampToScale(
+          scale,
+          label === "HIGH"
+            ? Math.max(level, triggerLevelLow + separation)
+            : Math.min(level, triggerLevelHigh - separation),
+        ),
+      );
+    },
+    [scale, triggerLevelHigh, triggerLevelLow],
   );
 
   const levelFromPointer = (
     event: ReactPointerEvent<HTMLDivElement>,
   ): number => {
     const rect = event.currentTarget.getBoundingClientRect();
-    return trackOffsetToLevel(event.clientY - rect.top);
+    return trackOffsetToLevel(scale, event.clientY - rect.top);
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -261,7 +279,8 @@ export function ThresholdTrack({
 
   const highLevel = drag?.label === "HIGH" ? drag.level : triggerLevelHigh;
   const lowLevel = drag?.label === "LOW" ? drag.level : triggerLevelLow;
-  const layout = resolveThresholdLayout(highLevel, lowLevel);
+  const layout = resolveThresholdLayout(scale, highLevel, lowLevel);
+  const separation = thresholdMinSeparation(scale);
 
   return (
     <Box
@@ -285,19 +304,21 @@ export function ThresholdTrack({
       <ThresholdPointer
         name={name}
         text={pointerText.low}
+        scale={scale}
         layout={layout.low}
         value={lowLevel}
         valueMin={0}
-        valueMax={highLevel - THRESHOLD_MIN_SEPARATION_FEET}
+        valueMax={highLevel - separation}
         disabled={disabled}
       />
       <ThresholdPointer
         name={name}
         text={pointerText.high}
+        scale={scale}
         layout={layout.high}
         value={highLevel}
-        valueMin={lowLevel + THRESHOLD_MIN_SEPARATION_FEET}
-        valueMax={WATER_LEVEL_MAX_FEET}
+        valueMin={lowLevel + separation}
+        valueMax={scale.max}
         disabled={disabled}
       />
     </Box>

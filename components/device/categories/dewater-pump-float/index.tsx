@@ -13,11 +13,14 @@ import { useBluetooth } from "@/context/bluetooth-provider";
 import type { ProvisionProgress } from "@/context/bluetooth-provider";
 import type { CategoryDetailsProps } from "@/components/device/categories";
 import {
+  MOTOR_CURRENT_HIGH_DEFAULT,
+  MOTOR_CURRENT_LOW_DEFAULT,
   PumpMonitoringPalette,
   WATER_LEVEL_MAX_FEET,
   WATER_TRIGGER_LEVEL_HIGH_DEFAULT,
   WATER_TRIGGER_LEVEL_LOW_DEFAULT,
 } from "./constants";
+import { MotorCurrentChart } from "./motor-current-chart";
 import { PumpMonitoringDashboard } from "./pump-monitoring-dashboard";
 import { DeviceSetupDialog } from "./device-setup-dialog";
 
@@ -26,6 +29,7 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
     connectedDevice,
     readings,
     waterLevelSamples,
+    motorCurrentSamples,
     deviceProductUid,
     deviceSerialNumber,
     provisionDevice,
@@ -33,6 +37,7 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
     disconnect,
   } = useBluetooth();
   const samples = isConnected ? waterLevelSamples : [];
+  const currentSamples = isConnected ? motorCurrentSamples : [];
   const [editOpen, setEditOpen] = useState(false);
 
   // Shared by the water level column (which sets them) and the telemetry
@@ -42,6 +47,15 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
   );
   const [waterTriggerLevelLow, setWaterTriggerLevelLow] = useState(
     WATER_TRIGGER_LEVEL_LOW_DEFAULT,
+  );
+
+  // The motor current band, held here for the same reason: the current column
+  // sets it and the chart below marks it.
+  const [motorCurrentHigh, setMotorCurrentHigh] = useState(
+    MOTOR_CURRENT_HIGH_DEFAULT,
+  );
+  const [motorCurrentLow, setMotorCurrentLow] = useState(
+    MOTOR_CURRENT_LOW_DEFAULT,
   );
 
   const needsSetup =
@@ -87,6 +101,10 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
             waterTriggerLevelLow={waterTriggerLevelLow}
             onWaterTriggerLevelHighChange={setWaterTriggerLevelHigh}
             onWaterTriggerLevelLowChange={setWaterTriggerLevelLow}
+            motorCurrentHigh={motorCurrentHigh}
+            motorCurrentLow={motorCurrentLow}
+            onMotorCurrentHighChange={setMotorCurrentHigh}
+            onMotorCurrentLowChange={setMotorCurrentLow}
           />
         </CardContent>
       </Card>
@@ -112,8 +130,13 @@ export function DewaterPumpFloatDetails({ isConnected }: CategoryDetailsProps) {
           },
         ]}
       />
-      {/* <SamplePeriodControl />
-      <CommandConsole categoryId="dewater-pump-float" /> */}
+      <MotorCurrentChart
+        samples={currentSamples}
+        maxThreshold={motorCurrentHigh}
+        minThreshold={motorCurrentLow}
+      />
+      {/* <SamplePeriodControl /> */}
+      {/* <CommandConsole categoryId="dewater-pump-float" /> */}
       <DeviceSetupDialog
         open={needsSetup}
         onSubmit={provisionDevice}

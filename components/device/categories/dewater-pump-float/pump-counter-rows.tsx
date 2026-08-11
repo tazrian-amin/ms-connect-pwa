@@ -5,8 +5,16 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 
-import { PUMP_DISABLED_OPACITY, PumpMonitoringPalette } from "./constants";
-import type { PumpColumnView } from "./pump-header-rows";
+import {
+  PUMP_COLUMN_SCALE_INSET,
+  PUMP_DISABLED_OPACITY,
+  PumpMonitoringPalette,
+} from "./constants";
+import {
+  GaugeTrackGutter,
+  PumpGroupGutter,
+  type PumpColumnView,
+} from "./pump-header-rows";
 import type { PumpStatus, SessionCounter } from "./types";
 import { formatResetTime, type LastResetTimes } from "./use-last-reset";
 
@@ -76,7 +84,11 @@ function CounterRowLabel({ children }: { children: ReactNode }) {
  * says whose it is; a box around each would only repeat the grid.
  *
  * Tabular figures so the digits hold their columns as the counters tick, rather
- * than shuffling sideways every time a 1 becomes a 2.
+ * than shuffling sideways every time a 1 becomes a 2. Centred on the gauge
+ * above rather than on the grid column, which carries that gauge's scale as
+ * well — see PUMP_COLUMN_SCALE_INSET. A long figure overruns that inset into
+ * the scale's empty width, which is free: nothing else stands in it on a
+ * counter row.
  */
 function CounterValue({
   value,
@@ -99,6 +111,7 @@ function CounterValue({
         letterSpacing: 0.3,
         lineHeight: 1.4,
         textAlign: "center",
+        pr: `${PUMP_COLUMN_SCALE_INSET}px`,
         whiteSpace: "nowrap",
         fontVariantNumeric: "tabular-nums",
         ...(dimmed ? { opacity: PUMP_DISABLED_OPACITY } : {}),
@@ -128,7 +141,9 @@ function CounterValueRow({
 }) {
   return (
     <>
+      <GaugeTrackGutter />
       <CounterRowLabel>{label}</CounterRowLabel>
+      <PumpGroupGutter />
       {views.map(({ column, pump }) => (
         <CounterValue
           key={column.number}
@@ -244,9 +259,18 @@ function ResetAllButton({
   );
 }
 
-/** Empty cell holding the grid's label column open on the button rows. */
-function LabelGutter() {
-  return <Box />;
+/**
+ * Empty cells holding the grid's motor current column, label column and group
+ * gap open on the button rows — the reset button starts at the first pump.
+ */
+function ButtonRowGutters() {
+  return (
+    <>
+      <GaugeTrackGutter />
+      <Box />
+      <PumpGroupGutter />
+    </>
+  );
 }
 
 /**
@@ -291,7 +315,7 @@ export function PumpCounterRows({
         variant="session"
       />
 
-      <LabelGutter />
+      <ButtonRowGutters />
       <ResetAllButton
         counter="runtime"
         span={views.length}
@@ -317,7 +341,7 @@ export function PumpCounterRows({
         variant="session"
       />
 
-      <LabelGutter />
+      <ButtonRowGutters />
       <ResetAllButton
         counter="starts"
         span={views.length}

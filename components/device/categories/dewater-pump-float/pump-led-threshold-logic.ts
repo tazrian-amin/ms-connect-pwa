@@ -1,12 +1,12 @@
-import { clampFeet } from "./threshold-track-math";
+import { WATER_LEVEL_SCALE } from "./constants";
+import { clampToScale, valueToSegmentIndex } from "./threshold-track-math";
 
 /**
- * Segment holding a given depth. One segment is one foot, so the two are the
- * same number — the conversion exists to name which of the two a value is.
- * Segment index 0 is the bottom foot of the column.
+ * A pump column always measures water depth, so everything here is on the
+ * water scale — one segment per foot.
  */
 function feetToSegmentIndex(feet: number): number {
-  return Math.round(clampFeet(feet));
+  return valueToSegmentIndex(WATER_LEVEL_SCALE, feet);
 }
 
 /** Segment index where the dead band starts (bottom of grey zone). */
@@ -34,7 +34,10 @@ export function waterLevelToTopSegmentIndex(waterLevel: number) {
  * (e.g. an empty/0 ft reading) always reads as OFF.
  */
 export function isPumpOn(waterLevel: number, triggerLevelHigh: number): boolean {
-  return clampFeet(waterLevel) > clampFeet(triggerLevelHigh);
+  return (
+    clampToScale(WATER_LEVEL_SCALE, waterLevel) >
+    clampToScale(WATER_LEVEL_SCALE, triggerLevelHigh)
+  );
 }
 
 export type PumpLedSegmentState = "red" | "green" | "off";

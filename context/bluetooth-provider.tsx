@@ -40,8 +40,11 @@ import {
 
 // Safety cap on retained ADC history to bound memory over long sessions.
 const MAX_ADC_SAMPLES = 1000;
-// Same bound for the derived water-level history (see waterLevelSamples).
+// Same bound for the derived water-level history (see waterLevelSamples), and
+// for the motor-current history beside it — both are accumulated from the same
+// periodic report, one sample each per interval.
 const MAX_WATER_LEVEL_SAMPLES = 1000;
+const MAX_MOTOR_CURRENT_SAMPLES = 1000;
 
 /** Default round-trip budget for a reply to a single config command. */
 const REPLY_TIMEOUT_MS = 10000;
@@ -85,6 +88,10 @@ interface BluetoothContextValue {
   // periodic JSON reports so the telemetry chart can plot it over time. `readings`
   // only ever holds the latest value per key, so it can't back a chart on its own.
   waterLevelSamples: AdcSample[];
+  // Time-series of the firmware's motor_current (amps RMS), accumulated from the
+  // same periodic reports as waterLevelSamples — the device samples both off the
+  // same filtered-ADC pass, so the two series share a sample period and a clock.
+  motorCurrentSamples: AdcSample[];
   // Per-pump runtime, keyed by pump id (1-based), accumulated from the firmware's
   // pump_N_state transitions. See PumpRuntime for the total-runtime formula.
   pumpRuntimes: Record<number, PumpRuntime>;
@@ -146,6 +153,9 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
     useState<DeviceCategory | null>(null);
   const [adcSamples, setAdcSamples] = useState<AdcSample[]>([]);
   const [waterLevelSamples, setWaterLevelSamples] = useState<AdcSample[]>([]);
+  const [motorCurrentSamples, setMotorCurrentSamples] = useState<AdcSample[]>(
+    [],
+  );
   const [pumpRuntimes, setPumpRuntimes] = useState<Record<number, PumpRuntime>>(
     {},
   );
@@ -274,6 +284,21 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
               const next = [...prev, { timestamp: eventTimestamp, value: waterLevel }];
               return next.length > MAX_WATER_LEVEL_SAMPLES
                 ? next.slice(next.length - MAX_WATER_LEVEL_SAMPLES)
+                : next;
+            });
+          }
+        }
+
+        if (json.motor_current !== undefined) {
+          const motorCurrent = Number(json.motor_current);
+          if (Number.isFinite(motorCurrent)) {
+            setMotorCurrentSamples((prev) => {
+              const next = [
+                ...prev,
+                { timestamp: eventTimestamp, value: motorCurrent },
+              ];
+              return next.length > MAX_MOTOR_CURRENT_SAMPLES
+                ? next.slice(next.length - MAX_MOTOR_CURRENT_SAMPLES)
                 : next;
             });
           }
@@ -447,6 +472,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
     setReadings([]);
     setAdcSamples([]);
     setWaterLevelSamples([]);
+    setMotorCurrentSamples([]);
     setPumpRuntimes({});
     setCommandLog([]);
     setSamplePeriodMs(null);
@@ -502,6 +528,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
         setReadings([]);
         setAdcSamples([]);
         setWaterLevelSamples([]);
+        setMotorCurrentSamples([]);
         setPumpRuntimes({});
         setCommandLog([]);
         setSamplePeriodMs(null);
@@ -835,6 +862,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       clearError,
       adcSamples,
       waterLevelSamples,
+      motorCurrentSamples,
       pumpRuntimes,
       resetPumpRuntime,
       commandLog,
@@ -862,6 +890,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       clearError,
       adcSamples,
       waterLevelSamples,
+      motorCurrentSamples,
       pumpRuntimes,
       resetPumpRuntime,
       commandLog,

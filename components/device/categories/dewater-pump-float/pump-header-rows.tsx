@@ -9,10 +9,10 @@ import Typography from "@mui/material/Typography";
 
 import {
   COLUMN_TITLE_HEIGHT,
+  PUMP_COLUMN_SCALE_INSET,
   PUMP_TOGGLE_HEIGHT,
   PumpMonitoringPalette,
   STATUS_INDICATOR_HEIGHT,
-  STATUS_INDICATOR_MAX_WIDTH,
 } from "./constants";
 import {
   PUMP_RUN_STATE_LABELS,
@@ -31,6 +31,13 @@ export interface PumpColumnView {
 
 interface PumpHeaderRowsProps {
   views: PumpColumnView[];
+  /**
+   * Heads the gauge track — the grid's first column, where the motor current
+   * column stands. Given all three header rows as one cell: that track has no
+   * switch, number or status to line up with, so splitting it across them
+   * would only put a heading on rows that mean nothing to it.
+   */
+  leading?: ReactNode;
   onEnabledChange: (pumpId: number, enabled: boolean) => void;
   /** Read-only dashboard: the switches are inert, the rest reads as normal. */
   locked: boolean;
@@ -42,7 +49,52 @@ interface PumpHeaderRowsProps {
 const UNBOUND_LABEL = "—";
 
 /**
- * The row's name, in the grid's first column — the same column the water level
+ * Empty cell holding open the grid's first track, where the motor current
+ * column stands. Every counter row emits one, because a row that skipped it
+ * would shunt its whole line one column to the left. The header rows are
+ * covered instead by the heading below, which spans all three of them.
+ */
+export function GaugeTrackGutter() {
+  return <Box />;
+}
+
+/**
+ * Empty cell holding open the gap track that sets the pumps apart from the two
+ * reading columns — see PUMP_GROUP_GAP. Emitted by every row for the same
+ * reason as the gutter above: the track exists whether or not a row has
+ * anything to put in it, and a row that skipped it would shunt its pumps a
+ * column to the left.
+ */
+export function PumpGroupGutter() {
+  return <Box />;
+}
+
+/**
+ * The gauge track's heading, spanning the three header rows as a single cell.
+ *
+ * Placed first, so the grid's own auto-placement does the rest: with this cell
+ * holding rows 1-3 of the first column, every following row's cells simply
+ * skip it and start at the labels, exactly as they would past three separate
+ * gutters.
+ */
+function GaugeTrackHeading({ children }: { children: ReactNode }) {
+  return (
+    <Box
+      sx={{
+        gridRow: "span 3",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        px: 0.5,
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+/**
+ * The row's name, in the grid's label column — the same column the water level
  * gauge sits in underneath. Centered on that column, the way every pump cell is
  * centered on its own, so the three read as one stack.
  */
@@ -71,7 +123,11 @@ function RowLabel({ children, height }: { children: ReactNode; height: number })
   );
 }
 
-/** One cell of a header row, centered over its pump's gauge below. */
+/**
+ * One cell of a header row, centered over its pump's gauge below — over the
+ * LEDs, that is, not over the grid column, which carries the scale beside them
+ * as well. See PUMP_COLUMN_SCALE_INSET.
+ */
 function HeaderCell({ children, height }: { children: ReactNode; height: number }) {
   return (
     <Box
@@ -79,6 +135,7 @@ function HeaderCell({ children, height }: { children: ReactNode; height: number 
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        pr: `${PUMP_COLUMN_SCALE_INSET}px`,
         height,
       }}
     >
@@ -170,6 +227,10 @@ function PumpTitle({ pump }: { pump: PumpStatus | null }) {
  * the four it can be. The word is the whole indicator, so its colour is what
  * separates the four at a glance. An unbound column has no pump to have a state
  * at all, and shows the same dash its counters do.
+ *
+ * Fills the width its cell leaves it, which is the gauge's own — the pill is
+ * the widest thing in the header stack, and squaring it to the LEDs is what
+ * makes the six read as one row of chips over one row of columns.
  */
 function StatusIndicator({ runState }: { runState: PumpRunState | null }) {
   return (
@@ -180,12 +241,14 @@ function StatusIndicator({ runState }: { runState: PumpRunState | null }) {
         alignItems: "center",
         justifyContent: "center",
         width: "100%",
-        maxWidth: STATUS_INDICATOR_MAX_WIDTH,
         height: STATUS_INDICATOR_HEIGHT,
         bgcolor: PumpMonitoringPalette.columnBg,
         border: `1px solid ${PumpMonitoringPalette.borderMuted}`,
         borderRadius: "12px",
-        px: 1,
+        // The pill is now the gauge's width rather than the whole column's,
+        // and "Disabled" is the longest word it has to hold — so the padding
+        // is the little that is left over after the word.
+        px: 0.75,
       }}
     >
       <Typography
@@ -213,13 +276,16 @@ function StatusIndicator({ runState }: { runState: PumpRunState | null }) {
  */
 export function PumpHeaderRows({
   views,
+  leading,
   onEnabledChange,
   locked,
   isEnablePending,
 }: PumpHeaderRowsProps) {
   return (
     <>
+      <GaugeTrackHeading>{leading}</GaugeTrackHeading>
       <RowLabel height={PUMP_TOGGLE_HEIGHT}>Enable/Disable</RowLabel>
+      <PumpGroupGutter />
       {views.map(({ column, pump }) => (
         <HeaderCell key={column.number} height={PUMP_TOGGLE_HEIGHT}>
           <EnableSwitch
@@ -233,6 +299,7 @@ export function PumpHeaderRows({
       ))}
 
       <RowLabel height={COLUMN_TITLE_HEIGHT}>Pumps</RowLabel>
+      <PumpGroupGutter />
       {views.map(({ column, pump }) => (
         <HeaderCell key={column.number} height={COLUMN_TITLE_HEIGHT}>
           <PumpTitle pump={pump} />
@@ -240,6 +307,7 @@ export function PumpHeaderRows({
       ))}
 
       <RowLabel height={STATUS_INDICATOR_HEIGHT}>Status</RowLabel>
+      <PumpGroupGutter />
       {views.map(({ column, runState }) => (
         <HeaderCell key={column.number} height={STATUS_INDICATOR_HEIGHT}>
           <StatusIndicator runState={runState} />

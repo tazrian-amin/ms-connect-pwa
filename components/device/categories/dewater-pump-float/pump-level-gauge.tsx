@@ -7,16 +7,17 @@ import Typography from "@mui/material/Typography";
 import {
   LedColumnPendingOverlay,
   LedColumnShell,
-  ledSegmentBaseSx,
+  ledSegmentSx,
   ledSegmentGlowSx,
 } from "./led-column-shell";
-import { GaugeWithScale } from "./level-scale";
+import { GaugeFrame } from "./level-scale";
 import { getPumpLedSegmentState } from "./pump-led-threshold-logic";
 import { ThresholdTrack } from "./threshold-track";
 import {
-  LED_SEGMENT_COUNT,
+  gaugeSegmentCount,
   PUMP_DISABLED_OPACITY,
   PumpMonitoringPalette,
+  WATER_LEVEL_SCALE,
 } from "./constants";
 
 interface PumpLevelGaugeProps {
@@ -57,6 +58,10 @@ const SEGMENT_COLORS = {
  * and a foot scale beside it. Both sliders travel the full 0–60 ft column and
  * are held a foot apart, so the lit bands they bound (red below LOW, green
  * above HIGH) can be any size short of meeting.
+ *
+ * The scale stands to the right of the gauge with nothing balancing it on the
+ * left, so the assembly is wider on that side than the LEDs it names — see
+ * PUMP_COLUMN_SCALE_INSET for how the rest of the column follows them.
  */
 export function PumpLevelGauge({
   triggerLevelLow,
@@ -68,9 +73,11 @@ export function PumpLevelGauge({
   pending = false,
 }: PumpLevelGaugeProps) {
   const segments = useMemo(
-    () => Array.from({ length: LED_SEGMENT_COUNT }, (_, i) => i),
+    () =>
+      Array.from({ length: gaugeSegmentCount(WATER_LEVEL_SCALE) }, (_, i) => i),
     [],
   );
+  const segmentSx = ledSegmentSx(WATER_LEVEL_SCALE);
 
   return (
     <Box
@@ -81,7 +88,7 @@ export function PumpLevelGauge({
         ...(disabled ? { opacity: PUMP_DISABLED_OPACITY } : {}),
       }}
     >
-      <GaugeWithScale>
+      <GaugeFrame scale={WATER_LEVEL_SCALE}>
         <LedColumnShell>
           {segments.map((index) => {
             // A disabled pump keeps its band boundaries visible through the
@@ -96,7 +103,7 @@ export function PumpLevelGauge({
               <Box
                 key={index}
                 sx={{
-                  ...ledSegmentBaseSx,
+                  ...segmentSx,
                   bgcolor: color,
                   ...ledSegmentGlowSx(glow),
                 }}
@@ -115,7 +122,7 @@ export function PumpLevelGauge({
         />
 
         {pending && <LedColumnPendingOverlay />}
-      </GaugeWithScale>
+      </GaugeFrame>
 
       <Typography sx={{ mt: 0.75, fontSize: 11, color: PumpMonitoringPalette.textMuted, fontWeight: 500 }}>
         High {triggerLevelHigh} ft

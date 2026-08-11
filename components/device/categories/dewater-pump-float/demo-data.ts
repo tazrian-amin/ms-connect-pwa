@@ -1,4 +1,5 @@
 import { PUMP_COUNT } from "./constants";
+import { OperationMode, type OperationModeValue } from "./device-settings";
 import type { PumpMonitoringData } from "./types";
 
 /**
@@ -34,6 +35,39 @@ export function createDemoPumpMonitoringData(): PumpMonitoringData {
   }));
 
   return { waterLevel, pumps, columns };
+}
+
+/** One column's pair of trigger levels, in feet. */
+export type ColumnLevels = { high: number; low: number };
+
+/**
+ * Stands in for the device's per-mode threshold sets while disconnected, so
+ * selecting an operation mode still moves the columns without hardware.
+ *
+ * Every column in a mode starts on the same pair — the device has no opinion
+ * about which column is which either — but the three pairs differ, so the
+ * point of the setting is visible the moment a mode is picked. Normal matches
+ * the firmware's own defaults; winter holds a deeper working level; flush
+ * pumps the shaft right down.
+ */
+const DEMO_MODE_LEVELS: Record<OperationModeValue, ColumnLevels> = {
+  [OperationMode.Normal]: { high: 30, low: 15 },
+  [OperationMode.Winter]: { high: 45, low: 30 },
+  [OperationMode.Flush]: { high: 20, low: 2 },
+};
+
+/** A full set of six columns' levels per mode — the demo's threshold store. */
+export function createDemoModeColumnLevels(): Record<
+  OperationModeValue,
+  ColumnLevels[]
+> {
+  const forMode = (mode: OperationModeValue) =>
+    Array.from({ length: PUMP_COUNT }, () => ({ ...DEMO_MODE_LEVELS[mode] }));
+  return {
+    [OperationMode.Normal]: forMode(OperationMode.Normal),
+    [OperationMode.Winter]: forMode(OperationMode.Winter),
+    [OperationMode.Flush]: forMode(OperationMode.Flush),
+  };
 }
 
 /**

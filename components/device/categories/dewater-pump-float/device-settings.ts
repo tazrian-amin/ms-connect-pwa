@@ -43,6 +43,37 @@ export function readAlterationMode(
   return mode !== null && isAlterationMode(mode) ? mode : null;
 }
 
+/**
+ * Which set of column thresholds the device has in service. It keeps a full
+ * set of six high/low pairs per mode and swaps them in whole, so the mode is a
+ * device setting like any other here — the thresholds reported for a column
+ * are always the selected mode's, and a threshold set while a mode is selected
+ * is stored against that mode.
+ *
+ * The names are the situations they stand for rather than any behaviour of
+ * their own: nothing about a mode changes how the pumps are controlled beyond
+ * the levels it carries.
+ */
+export const OperationMode = {
+  Normal: 0,
+  Winter: 1,
+  Flush: 2,
+} as const;
+
+export type OperationModeValue =
+  (typeof OperationMode)[keyof typeof OperationMode];
+
+export function isOperationMode(value: number): value is OperationModeValue {
+  return value === 0 || value === 1 || value === 2;
+}
+
+export function readOperationMode(
+  readings: DeviceReading[],
+): OperationModeValue | null {
+  const mode = readNumber(readings, "operation_mode");
+  return mode !== null && isOperationMode(mode) ? mode : null;
+}
+
 /** Thresholds the firmware holds for one column; null = not reported yet. */
 export interface ReportedColumnSettings {
   triggerLevelHigh: number | null;
@@ -111,6 +142,26 @@ export function readWaterBand(readings: DeviceReading[]): {
     high: readNumber(readings, "water_high_thr"),
     low: readNumber(readings, "water_low_thr"),
   };
+}
+
+/**
+ * The device's motor-current alarm band, in amps; null on either side = not
+ * reported. On the same footing as the water band — stored and reported by the
+ * device, with no output wired to it yet.
+ */
+export function readCurrentBand(readings: DeviceReading[]): {
+  high: number | null;
+  low: number | null;
+} {
+  return {
+    high: readNumber(readings, "current_high_thr"),
+    low: readNumber(readings, "current_low_thr"),
+  };
+}
+
+/** Latest motor current the device has reported, in amps RMS. */
+export function readMotorCurrent(readings: DeviceReading[]): number | null {
+  return readNumber(readings, "motor_current");
 }
 
 export function readPumpMinOffTime(readings: DeviceReading[]): number | null {

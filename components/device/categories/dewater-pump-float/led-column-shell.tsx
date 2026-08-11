@@ -3,13 +3,14 @@ import Box, { type BoxProps } from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 
 import {
+  gaugeSegmentHeight,
   LED_COLUMN_HEIGHT,
   LED_COLUMN_WIDTH,
   LED_COLUMN_PADDING,
   LED_SEGMENT_GAP,
-  LED_SEGMENT_HEIGHT,
   LED_SEGMENT_WIDTH,
   PumpMonitoringPalette,
+  type GaugeScale,
 } from "./constants";
 
 interface LedColumnShellProps {
@@ -17,12 +18,20 @@ interface LedColumnShellProps {
   sx?: BoxProps["sx"];
 }
 
-/** Shared segment bar dimensions (full width of the inner track). */
-export const ledSegmentBaseSx = {
-  width: LED_SEGMENT_WIDTH,
-  height: LED_SEGMENT_HEIGHT,
-  borderRadius: `${LED_SEGMENT_HEIGHT / 2}px`,
-} as const;
+/**
+ * Segment bar dimensions for one scale (full width of the inner track). The
+ * height comes from the scale because the stack's total height is fixed — a
+ * column with fewer, coarser steps gets taller LEDs rather than a shorter
+ * column. See gaugeSegmentHeight.
+ */
+export function ledSegmentSx(scale: GaugeScale) {
+  const height = gaugeSegmentHeight(scale);
+  return {
+    width: LED_SEGMENT_WIDTH,
+    height,
+    borderRadius: `${height / 2}px`,
+  } as const;
+}
 
 /** Glow applied to a lit segment; mirrors the RN shadow-based glow. */
 export function ledSegmentGlowSx(glowColor?: string): { boxShadow?: string } {

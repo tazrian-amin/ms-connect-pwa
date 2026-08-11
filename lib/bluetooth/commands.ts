@@ -33,12 +33,22 @@ export const RETROFIT_SAMPLE_PERIOD_MS_MAX = 86400000;
 export const RETROFIT_PUMP_MIN_OFF_TIME_MIN = 0;
 export const RETROFIT_PUMP_MIN_OFF_TIME_MAX = 999;
 
+// Motor current is reported and set in amps RMS over this range, on the same
+// scale the dashboard's current column draws — see the firmware's
+// kMotorCurrentMaxAmps.
+export const MOTOR_CURRENT_AMPS_MIN = 0;
+export const MOTOR_CURRENT_AMPS_MAX = 1000;
+
 function clampInt(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 function clampPumpThreshold(value: number): number {
   return clampInt(value, PUMP_THRESHOLD_FEET_MIN, PUMP_THRESHOLD_FEET_MAX);
+}
+
+function clampCurrentThreshold(value: number): number {
+  return clampInt(value, MOTOR_CURRENT_AMPS_MIN, MOTOR_CURRENT_AMPS_MAX);
 }
 
 /** DEWATERING — "Dewater Water Level Monitor" (dewater-water-level). */
@@ -104,6 +114,19 @@ export const retrofitFloatCommands = {
     set_alteration_mode: String(clampInt(mode, 0, 2)),
   }),
   /**
+   * Which set of column thresholds is in service: 0 = normal, 1 = winter,
+   * 2 = flush. The device keeps a full set of six high/low pairs per mode and
+   * swaps them in whole, so selecting a mode is what re-levels every column at
+   * once — and `column_N_set_high`/`_low` then write into whichever mode is
+   * selected, which is how a mode comes to hold its own levels.
+   *
+   * The device answers with the twelve thresholds now in force, so nothing has
+   * to be queried afterwards.
+   */
+  setOperationMode: (mode: number) => ({
+    set_operation_mode: String(clampInt(mode, 0, 2)),
+  }),
+  /**
    * `pump` is 1–6. UPCOMING FIRMWARE FEATURE — key name is provisional.
    * Disabling also turns the pump off firmware-side, so the PWA never has to
    * send a separate stop; the enabled flag is persisted across reboots.
@@ -151,6 +174,18 @@ export const retrofitFloatCommands = {
   setWaterLowThreshold: (feet: number) => ({
     set_water_low_thr: String(clampPumpThreshold(feet)),
   }),
+  /**
+   * Motor-current alarm band, in amps RMS (0-1000). The device stores and
+   * reports them exactly as it does the water band; no alarm output is wired
+   * to them yet. The dashboard's slider moves in steps of 20, but nothing here
+   * enforces that — the device takes any amp in range.
+   */
+  setCurrentHighThreshold: (amps: number) => ({
+    set_current_high_thr: String(clampCurrentThreshold(amps)),
+  }),
+  setCurrentLowThreshold: (amps: number) => ({
+    set_current_low_thr: String(clampCurrentThreshold(amps)),
+  }),
   echoColumnHighThreshold: (column: number) => ({
     echo: `column_${column}_high_thr`,
   }),
@@ -158,6 +193,7 @@ export const retrofitFloatCommands = {
     echo: `column_${column}_low_thr`,
   }),
   echoAlterationMode: () => ({ echo: "alteration_mode" }),
+  echoOperationMode: () => ({ echo: "operation_mode" }),
   echoPumpEnabled: (pump: number) => ({
     echo: `pump_${pump}_enabled`,
   }),
@@ -175,6 +211,11 @@ export const retrofitFloatCommands = {
   echoPumpMinOffTime: () => ({ echo: "pump_min_off_time_min" }),
   echoWaterHighThreshold: () => ({ echo: "water_high_thr" }),
   echoWaterLowThreshold: () => ({ echo: "water_low_thr" }),
+  echoCurrentHighThreshold: () => ({ echo: "current_high_thr" }),
+  echoCurrentLowThreshold: () => ({ echo: "current_low_thr" }),
+  /** Latest motor current, in amps RMS, from the same filtered ADC the
+   * periodic report carries. */
+  echoMotorCurrent: () => ({ echo: "motor_current" }),
   // Flat-style identity commands — same effect as cmd-style "set_config":
   // the MCU saves the field(s) and resets to sync with Notehub.
   setProductUid: (uid: string) => ({ set_product_uid: uid }),
@@ -249,6 +290,22 @@ const RETROFIT_FLOAT_ECHO_COMMANDS: EchoCommand[] = [
   {
     label: "Alteration mode",
     command: retrofitFloatCommands.echoAlterationMode(),
+  },
+  {
+    label: "Operation mode",
+    command: retrofitFloatCommands.echoOperationMode(),
+  },
+  {
+    label: "Motor current (Arms)",
+    command: retrofitFloatCommands.echoMotorCurrent(),
+  },
+  {
+    label: "Current high threshold",
+    command: retrofitFloatCommands.echoCurrentHighThreshold(),
+  },
+  {
+    label: "Current low threshold",
+    command: retrofitFloatCommands.echoCurrentLowThreshold(),
   },
   ...Array.from({ length: 6 }, (_, i) => i + 1).flatMap((n) => [
     {

@@ -7,13 +7,17 @@ import Typography from "@mui/material/Typography";
 import {
   LedColumnPendingOverlay,
   LedColumnShell,
-  ledSegmentBaseSx,
+  ledSegmentSx,
   ledSegmentGlowSx,
 } from "./led-column-shell";
-import { GaugeWithScale } from "./level-scale";
+import { GaugeFrame } from "./level-scale";
 import { ThresholdTrack, type ThresholdPointerText } from "./threshold-track";
-import { clampFeet } from "./threshold-track-math";
-import { LED_SEGMENT_COUNT, PumpMonitoringPalette } from "./constants";
+import { valueToSegmentIndex } from "./threshold-track-math";
+import {
+  gaugeSegmentCount,
+  PumpMonitoringPalette,
+  WATER_LEVEL_SCALE,
+} from "./constants";
 
 /**
  * The water column names its band Max/Min, matching the telemetry chart's
@@ -57,20 +61,23 @@ export function WaterLevelColumn({
   pending = false,
 }: WaterLevelColumnProps) {
   // One segment per foot, so the count of lit LEDs *is* the depth in feet.
-  const feet = Math.round(clampFeet(waterLevel));
+  const feet = valueToSegmentIndex(WATER_LEVEL_SCALE, waterLevel);
   const segments = useMemo(
-    () => Array.from({ length: LED_SEGMENT_COUNT }, (_, i) => i),
+    () =>
+      Array.from({ length: gaugeSegmentCount(WATER_LEVEL_SCALE) }, (_, i) => i),
     [],
   );
+  const segmentSx = ledSegmentSx(WATER_LEVEL_SCALE);
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <GaugeWithScale
+      <GaugeFrame
+        scale={WATER_LEVEL_SCALE}
         /* Reads bottom-to-top up the gauge, the way the level itself climbs,
-           and stands in the gutter that balances the scale — so it sits right
-           against the LEDs it names. Centered on the gauge alone, so it stays
-           put as the readouts underneath change height. */
-        gutter={
+           in a gutter of its own against the LEDs it names. Centered on the
+           gauge alone, so it stays put as the readouts underneath change
+           height. */
+        title={
           <Typography
             sx={{
               writingMode: "vertical-rl",
@@ -93,7 +100,7 @@ export function WaterLevelColumn({
               <Box
                 key={index}
                 sx={{
-                  ...ledSegmentBaseSx,
+                  ...segmentSx,
                   bgcolor: active ? PumpMonitoringPalette.waterActive : PumpMonitoringPalette.segmentInactive,
                   ...(active ? ledSegmentGlowSx(PumpMonitoringPalette.waterActiveGlow) : {}),
                 }}
@@ -113,7 +120,7 @@ export function WaterLevelColumn({
         />
 
         {pending && <LedColumnPendingOverlay />}
-      </GaugeWithScale>
+      </GaugeFrame>
 
       <Typography sx={{ mt: 0.75, fontSize: 11, color: PumpMonitoringPalette.textMuted, fontWeight: 500 }}>
         Max {triggerLevelHigh} ft

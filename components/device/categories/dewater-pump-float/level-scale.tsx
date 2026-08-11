@@ -1,78 +1,81 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 
 import {
+  GAUGE_TITLE_WIDTH,
+  gaugeSegmentCount,
   LED_COLUMN_HEIGHT,
   LED_COLUMN_WIDTH,
   LEVEL_SCALE_GAP,
-  LEVEL_SCALE_LABEL_STEP,
-  LEVEL_SCALE_MID_STEP,
+  LEVEL_SCALE_LABEL_GAP,
   LEVEL_SCALE_TICK_MAJOR,
   LEVEL_SCALE_TICK_MID,
   LEVEL_SCALE_TICK_MINOR,
-  LEVEL_SCALE_WIDTH,
+  levelScaleWidth,
   PumpMonitoringPalette,
-  WATER_LEVEL_MAX_FEET,
+  type GaugeScale,
 } from "./constants";
 import { levelToTrackOffset } from "./threshold-track-math";
 
 interface ScaleTick {
-  feet: number;
-  /** Offset from the column top, matching where a threshold at this depth sits. */
+  value: number;
+  /** Offset from the column top, matching where a threshold at this value sits. */
   top: number;
   length: number;
   labelled: boolean;
 }
 
 /**
- * Every column is the same height and covers the same depth, so the ticks are
- * worked out once here rather than per column.
- *
  * Placed through `levelToTrackOffset`, the same mapping the threshold pointers
  * use — which is what makes a pointer read against the scale beside it. The
  * offsets are rounded so a 1px rule lands on a device pixel instead of being
  * smeared across two.
  */
-const SCALE_TICKS: ScaleTick[] = Array.from(
-  { length: WATER_LEVEL_MAX_FEET + 1 },
-  (_, feet): ScaleTick => {
-    const labelled = feet % LEVEL_SCALE_LABEL_STEP === 0;
-    return {
-      feet,
-      top: Math.round(levelToTrackOffset(feet)),
-      length: labelled
-        ? LEVEL_SCALE_TICK_MAJOR
-        : feet % LEVEL_SCALE_MID_STEP === 0
-          ? LEVEL_SCALE_TICK_MID
-          : LEVEL_SCALE_TICK_MINOR,
-      labelled,
-    };
-  },
-);
+function buildScaleTicks(scale: GaugeScale): ScaleTick[] {
+  return Array.from(
+    { length: gaugeSegmentCount(scale) + 1 },
+    (_, index): ScaleTick => {
+      const value = index * scale.step;
+      const labelled = value % scale.labelStep === 0;
+      return {
+        value,
+        top: Math.round(levelToTrackOffset(scale, value)),
+        length: labelled
+          ? LEVEL_SCALE_TICK_MAJOR
+          : value % scale.midStep === 0
+            ? LEVEL_SCALE_TICK_MID
+            : LEVEL_SCALE_TICK_MINOR,
+        labelled,
+      };
+    },
+  );
+}
 
 /**
- * The foot scale beside a gauge: one tick per foot — one per LED — with every
- * fifth foot longer and every tenth labelled. It states what the LEDs are
- * counting, so a level or a threshold can be read off the column as a depth
- * without counting segments.
+ * The scale beside a gauge: one tick per step — one per LED — with the longer
+ * and labelled ones set by the scale itself. It states what the LEDs are
+ * counting, so a reading or a threshold can be read off the column without
+ * counting segments.
  *
- * Decorative: the depths it marks are already carried by the sliders' own
+ * Decorative: the values it marks are already carried by the sliders' own
  * accessible values and by the readouts under each column.
  */
-export function LevelScale() {
+export function LevelScale({ scale }: { scale: GaugeScale }) {
+  const ticks = useMemo(() => buildScaleTicks(scale), [scale]);
+
   return (
     <Box
       aria-hidden
       sx={{
         position: "relative",
-        width: LEVEL_SCALE_WIDTH,
+        width: levelScaleWidth(scale),
         height: LED_COLUMN_HEIGHT,
         flexShrink: 0,
       }}
     >
-      {SCALE_TICKS.map((tick) => (
-        <Box key={tick.feet}>
+      {ticks.map((tick) => (
+        <Box key={tick.value}>
           <Box
             sx={{
               position: "absolute",
@@ -93,15 +96,16 @@ export function LevelScale() {
                 // Reads against its own tick, so it is centred on the depth it
                 // names rather than hanging below it.
                 top: tick.top,
-                left: LEVEL_SCALE_TICK_MAJOR + 3,
+                left: LEVEL_SCALE_TICK_MAJOR + LEVEL_SCALE_LABEL_GAP,
                 transform: "translateY(-50%)",
                 fontSize: 9,
                 fontWeight: 600,
                 lineHeight: 1,
                 color: PumpMonitoringPalette.textMuted,
+                fontVariantNumeric: "tabular-nums",
               }}
             >
-              {tick.feet}
+              {tick.value}
             </Typography>
           )}
         </Box>
@@ -111,29 +115,31 @@ export function LevelScale() {
 }
 
 /**
- * A gauge with its foot scale to the right, and a gutter of the scale's width
- * to the left.
+ * A gauge with its scale down the right-hand side, and — where the column has
+ * one to state — its title up the left.
  *
- * That gutter is doing the work: without it the scale would push the LEDs off
- * the centre of their grid column, out from under the switch, number and
- * status pill that name them. Balanced, the assembly's centre line is the
- * gauge's own, so the column reads as one stack — and the readouts underneath
- * centre on the LEDs rather than on the scale.
- *
- * It is blank on a pump column, which has nothing to put there. The water
- * column passes its vertical title as `gutter`, so the counterweight is
- * something worth reading and the title sits against its gauge instead of a
- * scale's width away from it.
+ * The title gutter is opt-in and only the two reading columns take it: the
+ * motor current column and the water level column each name what they measure,
+ * up the side of the gauge rather than from a line above it. The six pump
+ * columns have nothing to put there, and are no longer given the blank gutter
+ * that used to mirror the scale on their left. It was there to hold the LEDs
+ * on their grid column's centre line, and it cost a scale's width per pump to
+ * do it — most of a column's worth of white space across the six. The columns
+ * now line up on the LEDs directly instead; see PUMP_COLUMN_SCALE_INSET.
  *
  * `children` are drawn in the gauge box, which is the positioning context for
  * the LED shell, the threshold pointers and the pending overlay alike.
  */
-export function GaugeWithScale({
+export function GaugeFrame({
   children,
-  gutter,
+  title,
+  scale,
 }: {
   children: ReactNode;
-  gutter?: ReactNode;
+  /** Vertical title naming what the gauge measures, set in its own gutter. */
+  title?: ReactNode;
+  /** What the scale beside the gauge counts in; omitted, none is drawn. */
+  scale?: GaugeScale;
 }) {
   return (
     <Box
@@ -143,18 +149,20 @@ export function GaugeWithScale({
         gap: `${LEVEL_SCALE_GAP}px`,
       }}
     >
-      <Box
-        sx={{
-          width: LEVEL_SCALE_WIDTH,
-          height: LED_COLUMN_HEIGHT,
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {gutter}
-      </Box>
+      {title && (
+        <Box
+          sx={{
+            width: GAUGE_TITLE_WIDTH,
+            height: LED_COLUMN_HEIGHT,
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {title}
+        </Box>
+      )}
       <Box
         sx={{
           position: "relative",
@@ -165,7 +173,7 @@ export function GaugeWithScale({
       >
         {children}
       </Box>
-      <LevelScale />
+      {scale && <LevelScale scale={scale} />}
     </Box>
   );
 }
