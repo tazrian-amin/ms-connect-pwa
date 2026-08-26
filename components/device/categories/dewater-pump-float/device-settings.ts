@@ -57,14 +57,21 @@ export function readAlterationMode(
 export const OperationMode = {
   Normal: 0,
   Winter: 1,
-  Flush: 2,
+  // Flush is withdrawn for now. The firmware still reserves the value and its
+  // stored threshold set, so restoring it is uncommenting this line, the
+  // matching entries in demo-data.ts and operation-mode-section.tsx, and the
+  // firmware's kOperationFlush.
+  // Flush: 2,
 } as const;
 
 export type OperationModeValue =
   (typeof OperationMode)[keyof typeof OperationMode];
 
 export function isOperationMode(value: number): value is OperationModeValue {
-  return value === 0 || value === 1 || value === 2;
+  // A device left in flush by an earlier build reports 2, which no longer
+  // passes here — readOperationMode returns null and the dashboard falls back
+  // to normal, which is what the next command it sends will select.
+  return value === 0 || value === 1;
 }
 
 export function readOperationMode(

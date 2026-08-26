@@ -45,15 +45,16 @@ export type ColumnLevels = { high: number; low: number };
  * selecting an operation mode still moves the columns without hardware.
  *
  * Every column in a mode starts on the same pair — the device has no opinion
- * about which column is which either — but the three pairs differ, so the
- * point of the setting is visible the moment a mode is picked. Normal matches
- * the firmware's own defaults; winter holds a deeper working level; flush
- * pumps the shaft right down.
+ * about which column is which either — but the pairs differ, so the point of
+ * the setting is visible the moment a mode is picked. Normal matches the
+ * firmware's own defaults; winter holds a deeper working level.
  */
 const DEMO_MODE_LEVELS: Record<OperationModeValue, ColumnLevels> = {
   [OperationMode.Normal]: { high: 30, low: 15 },
   [OperationMode.Winter]: { high: 45, low: 30 },
-  [OperationMode.Flush]: { high: 20, low: 2 },
+  // Flush withdrawn — restore with OperationMode.Flush. It pumped the shaft
+  // right down: { high: 20, low: 2 }.
+  // [OperationMode.Flush]: { high: 20, low: 2 },
 };
 
 /** A full set of six columns' levels per mode — the demo's threshold store. */
@@ -66,7 +67,7 @@ export function createDemoModeColumnLevels(): Record<
   return {
     [OperationMode.Normal]: forMode(OperationMode.Normal),
     [OperationMode.Winter]: forMode(OperationMode.Winter),
-    [OperationMode.Flush]: forMode(OperationMode.Flush),
+    // [OperationMode.Flush]: forMode(OperationMode.Flush),
   };
 }
 

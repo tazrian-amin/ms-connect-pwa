@@ -65,6 +65,18 @@ export function AlterationModeSection({
         </Typography>
         {pending && <CircularProgress size={14} />}
       </Box>
+      <Typography
+        sx={{
+          color: PumpMonitoringPalette.textMuted,
+          fontSize: 13,
+          lineHeight: "20px",
+        }}
+      >
+        Evens out wear by sharing demand across the enabled pumps. With no
+        alteration each column is always its own pump; on either setting a
+        column becomes a role and the device rotates which pump fills it,
+        leading with whichever has the fewest starts or the least run time.
+      </Typography>
 
       <RadioGroup
         value={String(mode)}

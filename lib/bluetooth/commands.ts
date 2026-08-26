@@ -114,17 +114,21 @@ export const retrofitFloatCommands = {
     set_alteration_mode: String(clampInt(mode, 0, 2)),
   }),
   /**
-   * Which set of column thresholds is in service: 0 = normal, 1 = winter,
-   * 2 = flush. The device keeps a full set of six high/low pairs per mode and
-   * swaps them in whole, so selecting a mode is what re-levels every column at
-   * once — and `column_N_set_high`/`_low` then write into whichever mode is
-   * selected, which is how a mode comes to hold its own levels.
+   * Which set of column thresholds is in service: 0 = normal, 1 = winter.
+   * The device keeps a full set of six high/low pairs per mode and swaps them
+   * in whole, so selecting a mode is what re-levels every column at once — and
+   * `column_N_set_high`/`_low` then write into whichever mode is selected,
+   * which is how a mode comes to hold its own levels.
    *
    * The device answers with the twelve thresholds now in force, so nothing has
    * to be queried afterwards.
+   *
+   * 2 = flush is withdrawn — the firmware rejects it, so the clamp stops at
+   * winter. Restore both together.
    */
   setOperationMode: (mode: number) => ({
-    set_operation_mode: String(clampInt(mode, 0, 2)),
+    // set_operation_mode: String(clampInt(mode, 0, 2)),
+    set_operation_mode: String(clampInt(mode, 0, 1)),
   }),
   /**
    * `pump` is 1–6. UPCOMING FIRMWARE FEATURE — key name is provisional.

@@ -25,7 +25,9 @@ const OPTIONS: {
 }[] = [
   { value: OperationMode.Normal, label: "Normal" },
   { value: OperationMode.Winter, label: "Winter" },
-  { value: OperationMode.Flush, label: "Flush" },
+  // Flush is withdrawn for now — the device still keeps a third threshold set,
+  // but nothing offers it. Restore alongside OperationMode.Flush.
+  // { value: OperationMode.Flush, label: "Flush" },
 ];
 
 /**
