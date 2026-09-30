@@ -32,7 +32,7 @@ export function ScaleMonitoringDashboard({ data: dataProp }: ScaleMonitoringDash
   // dashboard opens read-only and the user has to opt in before anything can be
   // changed by accident. A dropped connection re-locks it.
   const [editsEnabled, setEditsEnabled] = useState(false);
-  const editsUnlocked = editsEnabled && isConnected; // *************
+  const editsUnlocked = editsEnabled && isConnected;
   const toggleEdits = useCallback(() => setEditsEnabled((prev) => !prev), []);
 
   const [conveyorSettings, setConveyorSettings] = useState<ConveyorSettings>(DEFAULT_CONVEYOR_SETTINGS);
@@ -63,7 +63,7 @@ export function ScaleMonitoringDashboard({ data: dataProp }: ScaleMonitoringDash
         setConveyorSettings(conveyor);
       }
 
-      // No device command exists for the limits and goals yet, so they only
+      // No device command exists for the belt limits yet, so they only
       // update the page.
       if (limits != null) {
         setData((prev) => ({ ...prev, scale: { ...prev.scale, ...limits } }));

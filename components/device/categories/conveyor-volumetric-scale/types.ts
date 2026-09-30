@@ -16,14 +16,8 @@ export type ScaleReading = {
   dailyGoalPercent?: number;
   dailyProductionTon?: number;
   shiftProductionTon?: number;
-  highProductionLimit: number;
-  lowProductionLimit: number;
-  targetProductionRate: number;
-  blackBeltLimit: number;
   highBeltSpeedLimit: number;
   stoppedBeltLimit: number;
-  dailyProductionGoal: number;
-  shiftProductionGoal: number;
 };
 
 export type ScaleMonitoringData = {

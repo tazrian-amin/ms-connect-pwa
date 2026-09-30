@@ -19,8 +19,6 @@ import {
 } from "./conveyor-settings";
 import {
   BELT_LIMIT_FIELDS,
-  PRODUCTION_GOAL_FIELDS,
-  PRODUCTION_LIMIT_FIELDS,
   SCALE_LIMIT_FIELDS,
   type ScaleLimitField,
   type ScaleLimits,
@@ -58,7 +56,7 @@ export interface ConveyorSettingsChange {
 interface ConveyorSettingsSectionProps {
   /** Material and belt speed, as the device was last sent them. */
   settings: ConveyorSettings;
-  /** The scale's belt and production thresholds and goals. */
+  /** The scale's belt thresholds. */
   limits: ScaleLimits;
   /** The units every input is shown and entered in. */
   units: MeasurementUnits;
@@ -135,8 +133,7 @@ function sameUnits(a: MeasurementUnits, b: MeasurementUnits): boolean {
 /**
  * Everything the scale needs to know about its conveyor: the units it is all
  * entered in, the material on the belt (dry or wet, and how dense), the belt's
- * speed and speed limits, and the production limits and goals its readings are
- * judged against. Editing the fields changes nothing on its own; the changes
+ * speed and speed limits. Editing the fields changes nothing on its own; the changes
  * are saved together on Apply (or Enter).
  */
 export function ConveyorSettingsSection({
@@ -317,7 +314,7 @@ export function ConveyorSettingsSection({
   return (
     <SettingsPanel
       title="Scale Settings"
-      description="The material on the belt, how the belt runs, and the production limits and goals the scale's readings are judged against."
+      description="The material on the belt and how the belt runs."
     >
       <Box
         sx={{
@@ -398,18 +395,6 @@ export function ConveyorSettingsSection({
           {valueField("beltSpeed", "Belt Speed")}
           {BELT_LIMIT_FIELDS.map((field) => valueField(field.key, field.label))}
         </SettingsGroup>
-
-        {/* Full width: rates and goals read side by side. */}
-        <Box sx={{ gridColumn: { md: "1 / -1" } }}>
-          <SettingsGroup title="Production">
-            {PRODUCTION_LIMIT_FIELDS.map((field) =>
-              valueField(field.key, field.label),
-            )}
-            {PRODUCTION_GOAL_FIELDS.map((field) =>
-              valueField(field.key, field.label),
-            )}
-          </SettingsGroup>
-        </Box>
       </Box>
 
       {error ? (

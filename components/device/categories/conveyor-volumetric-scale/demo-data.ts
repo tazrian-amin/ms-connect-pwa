@@ -7,14 +7,8 @@ export function createDemoScaleMonitoringData(): ScaleMonitoringData {
     shiftNumber: 1,
     scale: {
       ...createDemoScaleConfig({
-        highProductionLimit: 620,
-        lowProductionLimit: 500,
-        targetProductionRate: 550,
-        blackBeltLimit: 10,
         highBeltSpeedLimit: 500,
         stoppedBeltLimit: 10,
-        dailyProductionGoal: 30000,
-        shiftProductionGoal: 200,
       }),
       id: "vs-1",
       name: "Scale-1",
