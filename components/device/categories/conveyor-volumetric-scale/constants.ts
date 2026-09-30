@@ -5,14 +5,11 @@
 export const ScalePalette = {
   panelBg: "var(--panel-bg)",
   rowBg: "var(--panel-bg-alt)",
-  rowAltBg: "var(--panel-bg)",
   border: "var(--panel-border)",
   borderMuted: "var(--panel-border-muted)",
   text: "var(--panel-text)",
   textMuted: "var(--panel-text-muted)",
-  textLight: "#ffffff",
   headerBg: "var(--panel-bg)",
-  totalRowBg: "#4a4a4a",
   onlineDot: "#22c55e",
   segmentInactive: "#5c5c5c",
   segmentLight: "#e8eaed",
@@ -23,8 +20,9 @@ export const ScalePalette = {
   goalProgress: "#d94040",
   buttonBg: "var(--panel-control-bg)",
   buttonText: "var(--panel-text)",
-  settingsIcon: "#4cb1e5",
   notesIcon: "var(--panel-text-muted)",
+  greenActive: "#10b981",
+  editUnlockedBg: "rgba(16, 185, 129, 0.14)",
 } as const;
 
 export const SCALE_STATUS_LABELS = {

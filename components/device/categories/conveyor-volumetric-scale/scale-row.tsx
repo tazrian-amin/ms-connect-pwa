@@ -1,34 +1,16 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
-import Button from "@mui/material/Button";
-import { EditScaleDialog } from "./edit-scale-dialog";
+import type { CSSProperties } from "react";
 import { COL_GAP, ROW_HEIGHT, ScalePalette } from "./constants";
 import { GoalGauge } from "./goal-gauge";
-import { useScaleDashboardLayout } from "./scale-dashboard-layout-context";
+import type { ScaleDashboardLayout } from "./dashboard-layout";
 import { ScaleStatusBar } from "./scale-status-bar";
 import type { ScaleReading } from "./types";
 import DescriptionIcon from "@mui/icons-material/Description";
-import OpenWithIcon from "@mui/icons-material/OpenWith";
-import SettingsIcon from "@mui/icons-material/Settings";
-import type { DragHandleProps } from "./sortable-list";
-
-const ICON_SIZE = 20;
-
-interface LocationOption {
-  id: string;
-  name: string;
-}
 
 interface ScaleRowProps {
   scale: ScaleReading;
-  rowIndex: number;
-  dragHandleProps?: DragHandleProps;
-  isDragging?: boolean;
-  locationOptions: LocationOption[];
-  currentLocationId: string;
-  onScaleUpdate?: (scale: ScaleReading) => void;
-  onOpenRateGraph: (scaleId: string, locationId: string) => void;
+  layout: ScaleDashboardLayout;
 }
 
 function formatRate(value: number | undefined): string {
@@ -41,58 +23,19 @@ function formatProduction(value: number | undefined): string {
   return value.toLocaleString("en-US");
 }
 
-export function ScaleRow({
-  scale,
-  rowIndex,
-  dragHandleProps,
-  isDragging = false,
-  locationOptions,
-  currentLocationId,
-  onScaleUpdate,
-  onOpenRateGraph,
-}: ScaleRowProps) {
-  const [editVisible, setEditVisible] = useState(false);
+export function ScaleRow({ scale, layout }: ScaleRowProps) {
   const isOffline = scale.state === "offline";
-  const rowBg = rowIndex % 2 === 0 ? ScalePalette.rowBg : ScalePalette.rowAltBg;
-  const { columns, contentWidth, scrollEnabled, stacked } = useScaleDashboardLayout();
-
-  const editDialog = (
-    <EditScaleDialog
-      visible={editVisible}
-      scale={scale}
-      locationOptions={locationOptions}
-      defaultLocationId={currentLocationId}
-      onClose={() => setEditVisible(false)}
-      onSave={(updatedScale) => {
-        onScaleUpdate?.(updatedScale);
-        setEditVisible(false);
-      }}
-    />
-  );
+  const rowBg = ScalePalette.rowBg;
+  const { columns, contentWidth, scrollEnabled, stacked } = layout;
 
   if (stacked) {
     return (
-      <div style={{ ...stackedCardStyle, backgroundColor: rowBg, ...(isDragging ? draggingStyle : {}) }}>
+      <div style={{ ...stackedCardStyle, backgroundColor: rowBg }}>
         <div style={stackedHeaderStyle}>
           <span style={{ ...statusDotStyle, ...(isOffline ? { backgroundColor: ScalePalette.segmentInactive } : {}) }} />
           <div style={nameBlockStyle}>
             <p style={scaleNameStyle}>{scale.name}</p>
             {scale.subtitle ? <p style={scaleSubtitleStyle}>{scale.subtitle}</p> : null}
-          </div>
-          <div style={iconRowStyle}>
-            <button type="button" style={iconButtonStyle} aria-label={`Edit ${scale.name} settings`} onClick={() => setEditVisible(true)}>
-              <SettingsIcon sx={{ fontSize: ICON_SIZE }} htmlColor={ScalePalette.settingsIcon} />
-            </button>
-            <button
-              type="button"
-              ref={dragHandleProps?.ref}
-              style={{ ...iconButtonStyle, cursor: "grab", touchAction: "none" }}
-              aria-label={`Reorder ${scale.name}`}
-              {...dragHandleProps?.attributes}
-              {...dragHandleProps?.listeners}
-            >
-              <OpenWithIcon sx={{ fontSize: ICON_SIZE }} htmlColor={ScalePalette.textMuted} />
-            </button>
           </div>
         </div>
 
@@ -133,21 +76,10 @@ export function ScaleRow({
         ) : null}
 
         <div style={stackedFooterStyle}>
-          <Button
-            variant="contained"
-            disableElevation
-            sx={{ ...rateGraphButtonSx, flex: 1 }}
-            aria-label={`Open rate graph for ${scale.name}`}
-            onClick={() => onOpenRateGraph(scale.id, currentLocationId)}
-          >
-            RATE GRAPH
-          </Button>
           <button type="button" style={notesButtonStyle} aria-label={`Notes for ${scale.name}`}>
             <DescriptionIcon sx={{ fontSize: 22 }} htmlColor={ScalePalette.notesIcon} />
           </button>
         </div>
-
-        {editDialog}
       </div>
     );
   }
@@ -158,37 +90,10 @@ export function ScaleRow({
         ...rowStyle,
         backgroundColor: rowBg,
         ...(scrollEnabled ? { width: contentWidth } : { width: "100%" }),
-        ...(isDragging ? draggingStyle : {}),
       }}
     >
       <div style={{ ...nameColStyle, width: columns.name }}>
         <span style={{ ...statusDotStyle, ...(isOffline ? { backgroundColor: ScalePalette.segmentInactive } : {}) }} />
-        <div style={controlsStyle}>
-          <Button
-            variant="contained"
-            disableElevation
-            sx={rateGraphButtonSx}
-            aria-label={`Open rate graph for ${scale.name}`}
-            onClick={() => onOpenRateGraph(scale.id, currentLocationId)}
-          >
-            RATE GRAPH
-          </Button>
-          <div style={iconRowStyle}>
-            <button type="button" style={iconButtonStyle} aria-label={`Edit ${scale.name} settings`} onClick={() => setEditVisible(true)}>
-              <SettingsIcon sx={{ fontSize: ICON_SIZE }} htmlColor={ScalePalette.settingsIcon} />
-            </button>
-            <button
-              type="button"
-              ref={dragHandleProps?.ref}
-              style={{ ...iconButtonStyle, cursor: "grab", touchAction: "none" }}
-              aria-label={`Reorder ${scale.name}`}
-              {...dragHandleProps?.attributes}
-              {...dragHandleProps?.listeners}
-            >
-              <OpenWithIcon sx={{ fontSize: ICON_SIZE }} htmlColor={ScalePalette.textMuted} />
-            </button>
-          </div>
-        </div>
         <div style={nameBlockStyle}>
           <p style={scaleNameStyle}>{scale.name}</p>
           {scale.subtitle ? <p style={scaleSubtitleStyle}>{scale.subtitle}</p> : null}
@@ -245,8 +150,6 @@ export function ScaleRow({
           <DescriptionIcon sx={{ fontSize: 22 }} htmlColor={ScalePalette.notesIcon} />
         </button>
       </div>
-
-      {editDialog}
     </div>
   );
 }
@@ -264,12 +167,6 @@ const rowStyle: CSSProperties = {
   paddingRight: 12,
 };
 
-const draggingStyle: CSSProperties = {
-  boxShadow: "0 4px 8px rgba(17, 24, 39, 0.12)",
-  position: "relative",
-  zIndex: 1,
-};
-
 const nameColStyle: CSSProperties = {
   display: "flex",
   flexDirection: "row",
@@ -284,41 +181,6 @@ const statusDotStyle: CSSProperties = {
   borderRadius: 5,
   backgroundColor: ScalePalette.onlineDot,
   flexShrink: 0,
-};
-
-const controlsStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 10,
-  flexShrink: 0,
-};
-
-// Pinned to ScalePalette, not the ambient MUI theme, since the row keeps a
-// hardcoded light background regardless of app theme mode.
-const rateGraphButtonSx = {
-  bgcolor: ScalePalette.buttonBg,
-  color: ScalePalette.buttonText,
-  borderRadius: "4px",
-  minHeight: 36,
-  fontSize: 11,
-  fontWeight: 700,
-  letterSpacing: 0.3,
-  "&:hover": { bgcolor: ScalePalette.borderMuted },
-};
-
-const iconRowStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "row",
-  gap: 12,
-  alignItems: "center",
-};
-
-const iconButtonStyle: CSSProperties = {
-  minWidth: 44,
-  minHeight: 44,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
 };
 
 const nameBlockStyle: CSSProperties = {
@@ -377,5 +239,6 @@ const stackedFooterStyle: CSSProperties = {
   display: "flex",
   flexDirection: "row",
   alignItems: "center",
+  justifyContent: "flex-end",
   gap: 8,
 };

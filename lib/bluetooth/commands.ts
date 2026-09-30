@@ -258,6 +258,33 @@ export const volumetricCommands = {
   setDeviceModel: (model: string) => ({ device_model: model }),
   /** Max 31 chars, e.g. "SN-001". */
   setSerialNumber: (serial: string) => ({ serial_number: serial }),
+  /**
+   * The material on the belt and the belt's speed. Density and belt speed are
+   * sent in the dashboard's selected units, with each unit alongside, so the
+   * firmware does the conversion. Units: density lb_ft3 | kg_m3 | g_cm3 | t_m3 | ton_yd3; belt
+   * speed ft_min | m_min | ft_s | m_s.
+   * TODO: key names are provisional until the volumetric firmware defines them.
+   */
+  setConveyorSettings: (settings: {
+    materialType: "dry" | "wet";
+    density: number;
+    densityUnit: string;
+    beltSpeed: number;
+    beltSpeedUnit: string;
+  }) => ({
+    cmd: "set_conveyor",
+    material_type: settings.materialType,
+    density: String(settings.density),
+    density_unit: settings.densityUnit,
+    belt_speed: String(settings.beltSpeed),
+    belt_speed_unit: settings.beltSpeedUnit,
+  }),
+  /**
+   * "calibration" tells the device the belt is running empty, so it can take
+   * its zero point; "normal" returns it to measuring material.
+   * TODO: key name is provisional until the volumetric firmware defines it.
+   */
+  setScaleMode: (mode: "normal" | "calibration") => ({ scale_mode: mode }),
 };
 
 const DEWATERING_ECHO_COMMANDS: EchoCommand[] = [

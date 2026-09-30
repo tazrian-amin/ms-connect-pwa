@@ -45,6 +45,8 @@ const MAX_ADC_SAMPLES = 1000;
 // periodic report, one sample each per interval.
 const MAX_WATER_LEVEL_SAMPLES = 1000;
 const MAX_MOTOR_CURRENT_SAMPLES = 1000;
+// Conveyor volumetric scale: the belt's production rate history.
+const MAX_PRODUCTION_RATE_SAMPLES = 1000;
 
 /** Default round-trip budget for a reply to a single config command. */
 const REPLY_TIMEOUT_MS = 10000;
@@ -92,6 +94,9 @@ interface BluetoothContextValue {
   // same periodic reports as waterLevelSamples — the device samples both off the
   // same filtered-ADC pass, so the two series share a sample period and a clock.
   motorCurrentSamples: AdcSample[];
+  // Time-series of the volumetric scale's production_rate (ton/hr), accumulated
+  // from its periodic reports the same way as waterLevelSamples.
+  productionRateSamples: AdcSample[];
   // Per-pump runtime, keyed by pump id (1-based), accumulated from the firmware's
   // pump_N_state transitions. See PumpRuntime for the total-runtime formula.
   pumpRuntimes: Record<number, PumpRuntime>;
@@ -156,6 +161,9 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
   const [motorCurrentSamples, setMotorCurrentSamples] = useState<AdcSample[]>(
     [],
   );
+  const [productionRateSamples, setProductionRateSamples] = useState<
+    AdcSample[]
+  >([]);
   const [pumpRuntimes, setPumpRuntimes] = useState<Record<number, PumpRuntime>>(
     {},
   );
@@ -299,6 +307,23 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
               ];
               return next.length > MAX_MOTOR_CURRENT_SAMPLES
                 ? next.slice(next.length - MAX_MOTOR_CURRENT_SAMPLES)
+                : next;
+            });
+          }
+        }
+
+        // UPCOMING FIRMWARE FEATURE: provisional key — if the volumetric
+        // firmware reports the rate under another name, only this changes.
+        if (json.production_rate !== undefined) {
+          const productionRate = Number(json.production_rate);
+          if (Number.isFinite(productionRate)) {
+            setProductionRateSamples((prev) => {
+              const next = [
+                ...prev,
+                { timestamp: eventTimestamp, value: productionRate },
+              ];
+              return next.length > MAX_PRODUCTION_RATE_SAMPLES
+                ? next.slice(next.length - MAX_PRODUCTION_RATE_SAMPLES)
                 : next;
             });
           }
@@ -473,6 +498,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
     setAdcSamples([]);
     setWaterLevelSamples([]);
     setMotorCurrentSamples([]);
+    setProductionRateSamples([]);
     setPumpRuntimes({});
     setCommandLog([]);
     setSamplePeriodMs(null);
@@ -529,6 +555,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
         setAdcSamples([]);
         setWaterLevelSamples([]);
         setMotorCurrentSamples([]);
+        setProductionRateSamples([]);
         setPumpRuntimes({});
         setCommandLog([]);
         setSamplePeriodMs(null);
@@ -863,6 +890,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       adcSamples,
       waterLevelSamples,
       motorCurrentSamples,
+      productionRateSamples,
       pumpRuntimes,
       resetPumpRuntime,
       commandLog,
@@ -891,6 +919,7 @@ export function BluetoothProvider({ children }: { children: ReactNode }) {
       adcSamples,
       waterLevelSamples,
       motorCurrentSamples,
+      productionRateSamples,
       pumpRuntimes,
       resetPumpRuntime,
       commandLog,
